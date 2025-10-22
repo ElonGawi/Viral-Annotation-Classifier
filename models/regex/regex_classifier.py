@@ -71,10 +71,10 @@ class RegexModel(object):
         for annotation in X:
             label = None
             if is_hypothetical_af(annotation) == True:
-                label = AnnotaionLabel.Uninformative
+                label = AnnotaionLabel.Uninformative.value
             elif is_low_af(annotation) == True:
-                label = AnnotaionLabel.Low
+                label = AnnotaionLabel.Low.value
             else:
-                label = AnnotaionLabel.Proper
+                label = AnnotaionLabel.Proper.value
             preds.append(label)
         return preds

@@ -4,6 +4,8 @@
 # A light class wrapper was added to fit our project strcture
 #
 import re
+from models import AnnotaionLabel
+
 
 # final filter lists
 hypothetical_af_search = ["whole genome shotgun sequence"] 
@@ -67,12 +69,12 @@ class RegexModel(object):
         """
         preds = []
         for annotation in X:
-            label = ""
+            label = None
             if is_hypothetical_af(annotation) == True:
-                label = "uninformative"
+                label = AnnotaionLabel.Uninformative
             elif is_low_af(annotation) == True:
-                label = "low"
+                label = AnnotaionLabel.Low
             else:
-                label = "proper"
+                label = AnnotaionLabel.Proper
             preds.append(label)
         return preds

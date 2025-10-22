@@ -4,7 +4,7 @@
 # A light class wrapper was added to fit our project strcture
 #
 import re
-from models import AnnotaionLabel
+from models.config import AnnotaionLabel
 
 
 # final filter lists

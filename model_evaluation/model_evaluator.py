@@ -1,3 +1,4 @@
+import pandas as pd
 import time
 import psutil
 import os
@@ -37,10 +38,45 @@ class ModelReport(object):
         print(f"Average time per prediction {self.avg_time_per_prediction:.5f} seconds\n")
         
         
-        # create confustion matrix and display it
+        # create the subplot layout
+        fig, axes = plt.subplots(3, 1, figsize=(6, 10))  # figsize optional
+        # the axis the plot will use
+        cm_plot = axes[0]
+        mem_plot = axes[1]
+        cpu_plot = axes[2]
+
+        ### create confustion matrix and display it
+        cm_plot.set_title("Confustion Matrix")
         cm_disp = ConfusionMatrixDisplay(confusion_matrix=self.cm, 
-                                         display_labels=self.cm_display_labels)
-        cm_disp.plot()
+                                            display_labels=self.cm_display_labels)
+        cm_disp.plot(ax=cm_plot)
+
+
+        ### the mem usage plot
+        mem_records_df = pd.DataFrame(list(self.memory_records.items()), columns=["TimeDelta", "MemUsage"])
+        # only ge mem usage delta
+        mem_usage_t0 = mem_records_df[mem_records_df["TimeDelta"] == 0]["MemUsage"][0]
+        mem_records_df["MemUsageDelta"] = mem_records_df["MemUsage"] - mem_usage_t0
+        # convert mem usage to MB
+        mem_records_df["MemUsageDeltaMB"] = mem_records_df["MemUsageDelta"] / (1024 * 1024)
+
+        mem_plot.plot(mem_records_df["TimeDelta"], mem_records_df["MemUsageDeltaMB"])
+        mem_plot.set_title("Memory Usage")
+        mem_plot.set_xlabel("Time (seconds)")
+        mem_plot.set_ylabel("Delta memory usage(MB)")
+
+        
+        ### Cpu plot        
+        cpu_records_df = pd.DataFrame(list(self.cpu_usage_records.items()), columns=["TimeDelta", "CPUUsage"])
+
+        cpu_plot.plot(cpu_records_df["TimeDelta"], cpu_records_df["CPUUsage"])
+        cpu_plot.set_title("CPU Usage across all cores")
+        cpu_plot.set_xlabel("Time (seconds)")
+        cpu_plot.set_ylabel("CPU Usage (%) of cores (100% = 1 core)")
+
+
+        plt.tight_layout()
+        plt.show()
 
 
 
@@ -61,31 +97,42 @@ class ModelEvaluator(object):
         return self.model.model.predict(self.eval_dataset["X"])
     
 
-    def _monitor_memory(interval=0.01):
+    def _profile(interval=0.01):
         """Continuously record memory usage of the current process."""
 
         # select current process
         process = psutil.Process()
         
         memory_records = {}
+
+        # keys are delta t, and the value is the CPU usage in precentage 
+        # (1 core = 100%, can be over 100% if multiple cores are used) 
+        # since the last call to the function so practically this is delta CPU usage
+        cpu_usage_records = {} 
+        
         start_time = time.time()
+
         # add a record for the memory at time t=0
         memory_records[0] = process.memory_info().rss
+        
+        # since this is the delta usage, first call will return 0, see https://psutil.readthedocs.io/en/latest/index.html#psutil.Process.memory_maps
+        cpu_usage_records[0] = process.cpu_percent(interval=None)
 
         def record():
             while not stop_event.is_set():
                 mem = process.memory_info().rss # in bytes
                 current_timestamp = time.time() - start_time # timestamp is the time delta
                 memory_records[current_timestamp] = mem
+                cpu_usage_records[current_timestamp] = process.cpu_percent(interval=None)
                 time.sleep(interval)
 
         stop_event = threading.Event()
         monitor_thread = threading.Thread(target=record)
         monitor_thread.start()
-        return stop_event, memory_records
+        return stop_event, memory_records, cpu_usage_records
 
 
-    def _predict_and_profile(self, report, monitor_mem=True, mem_monitor_interval=0.01):
+    def _predict_and_profile(self, report, profile=True, monitor_interval=0.01):
         """run preidtc and track performence such as time, mem usage
 
         Args:
@@ -93,8 +140,8 @@ class ModelEvaluator(object):
         """
         X_len = len(self.eval_dataset["X"])
         
-        if monitor_mem:
-            stop_event, memory_records = ModelEvaluator.monitor_memory(mem_monitor_interval)
+        if profile:
+            stop_event, memory_records, cpu_usage_records = ModelEvaluator._profile(monitor_interval)
         
         start_time = time.perf_counter()
 
@@ -102,9 +149,10 @@ class ModelEvaluator(object):
 
         end_time = time.perf_counter()
 
-        if monitor_mem:
+        if profile:
             stop_event.set()
             report.memory_records = memory_records
+            report.cpu_usage_records = cpu_usage_records
 
         report.model_runtime = end_time - start_time # seconds 
         report.avg_time_per_prediction = report.model_runtime/X_len

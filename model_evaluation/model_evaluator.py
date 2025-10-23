@@ -7,7 +7,7 @@ from sklearn.metrics import classification_report, confusion_matrix, balanced_ac
 from sklearn.metrics import ConfusionMatrixDisplay
 from sklearn.utils.multiclass import unique_labels
 from typing import Protocol, runtime_checkable
-from models.config import AnnotaionLabel
+from models.config import AnnotationLabels
 import threading
 import matplotlib.pyplot as plt
 
@@ -18,7 +18,7 @@ class ModelReport(object):
         self.model_title = None
         self.metrics = None
         
-        # confusion matrix and its displat labels 
+        # confusion matrix and its display labels 
         self.cm = None
         self.cm_display_labels = None
         
@@ -31,7 +31,7 @@ class ModelReport(object):
         self.memory_records = None
 
     def show_report(self):
-        print(f"#####\t Report for Model: f{self.model_title}\t\n")
+        print(f"#####\t Report for Model: {self.model_title}\t\n")
 
         print(self.metrics)
     
@@ -46,10 +46,11 @@ class ModelReport(object):
         mem_plot = axes[1]
         cpu_plot = axes[2]
 
-        ### create confustion matrix and display it
-        cm_plot.set_title("Confustion Matrix")
+        ### create Confusion matrix and display it
+        cm_plot.set_title("Confusion Matrix")
         cm_disp = ConfusionMatrixDisplay(confusion_matrix=self.cm, 
-                                            display_labels=[AnnotaionLabel(i).name for i in self.cm_display_labels])
+                                            display_labels=[AnnotationLabels.id2label[i] for i in self.cm_display_labels]
+                                            )
         cm_disp.plot(ax=cm_plot)
 
 
@@ -87,7 +88,7 @@ class ModelEvaluator(object):
 
         Args:
             model (ModelEvalWrapper): model to evaluate
-            eval_dataset (Dataframe): dataset to evaluate on, should have X and y 
+            eval_dataset (Dataframe): dataset to evaluate on, should have 2 columns "protein_annotation"  and "label"
         """
         assert isinstance(model, ModelEvalWrapper), "Model must be of a ModelEvalWrapper class"
         self.model = model
@@ -95,7 +96,7 @@ class ModelEvaluator(object):
 
 
     def _predict(self): 
-        return self.model.model.predict(self.eval_dataset["X"])
+        return self.model.model.predict(self.eval_dataset["protein_annotation"])
     
 
     def _profile(interval=0.01):
@@ -139,7 +140,7 @@ class ModelEvaluator(object):
         Args:
             report (_type_): report to fill in
         """
-        X_len = len(self.eval_dataset["X"])
+        X_len = len(self.eval_dataset["protein_annotation"])
         
         if profile:
             stop_event, memory_records, cpu_usage_records = ModelEvaluator._profile(monitor_interval)
@@ -164,14 +165,14 @@ class ModelEvaluator(object):
         report = ModelReport()     
         report.model_title = self.model.title
 
-        y_true = self.eval_dataset["y"]
+        y_true = self.eval_dataset["label"]
 
         y_pred, report = self._predict_and_profile(report=report)
 
 #        report.metrics = classification_report(y_true=y_true, y_pred=y_pred, output_dict=True)
         report.metrics = classification_report(y_true=y_true, y_pred=y_pred)
 
-        # confustion matrix
+        # Confusion matrix
         report.cm_display_labels = unique_labels(y_true, y_pred)
         report.cm = confusion_matrix(y_true,y_pred)
         return report

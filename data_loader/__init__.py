@@ -1,1 +1,1 @@
-from .annotation_data_loader import AnnotaionDataLoader
+from .annotation_data_loader import AnnotationDataLoader

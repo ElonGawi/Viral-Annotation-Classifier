@@ -4,7 +4,7 @@
 # A light class wrapper was added to fit our project strcture
 #
 import re
-from models.config import AnnotaionLabel
+from models.config import AnnotationLabels
 
 
 # final filter lists
@@ -62,7 +62,7 @@ class RegexModel(object):
         """_summary_
 
         Args:
-            X (iterateable): 
+            X (iterateable): k
 
         Returns:
             list : predictions
@@ -71,10 +71,10 @@ class RegexModel(object):
         for annotation in X:
             label = None
             if is_hypothetical_af(annotation) == True:
-                label = AnnotaionLabel.Uninformative.value
+                label = AnnotationLabels.label2id["Uninformative"]
             elif is_low_af(annotation) == True:
-                label = AnnotaionLabel.Low.value
+                label = AnnotationLabels.label2id["Low"]
             else:
-                label = AnnotaionLabel.Proper.value
+                label =  AnnotationLabels.label2id["Proper"]
             preds.append(label)
         return preds

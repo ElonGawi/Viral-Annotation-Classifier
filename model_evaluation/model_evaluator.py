@@ -7,6 +7,7 @@ from sklearn.metrics import classification_report, confusion_matrix, balanced_ac
 from sklearn.metrics import ConfusionMatrixDisplay
 from sklearn.utils.multiclass import unique_labels
 from typing import Protocol, runtime_checkable
+from models.config import AnnotaionLabel
 import threading
 import matplotlib.pyplot as plt
 
@@ -48,7 +49,7 @@ class ModelReport(object):
         ### create confustion matrix and display it
         cm_plot.set_title("Confustion Matrix")
         cm_disp = ConfusionMatrixDisplay(confusion_matrix=self.cm, 
-                                            display_labels=self.cm_display_labels)
+                                            display_labels=[AnnotaionLabel(i).name for i in self.cm_display_labels])
         cm_disp.plot(ax=cm_plot)
 
 

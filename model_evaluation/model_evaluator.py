@@ -189,7 +189,7 @@ class ModelEvaluator(object):
 
         # Confusion matrix
         report.cm_display_labels = unique_labels(y_true, y_pred)
-        report.cm = confusion_matrix(y_true, y_pred, normalize="true")
+        report.cm = confusion_matrix(y_true, y_pred)
         return report
 
 

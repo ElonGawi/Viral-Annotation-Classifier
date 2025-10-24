@@ -30,7 +30,11 @@ from IPython.display import display, HTML
 import numpy as np
 import io, base64
 from matplotlib.gridspec import GridSpec
-
+import matplotlib.pyplot as plt
+import plotly.graph_objects as go
+from IPython.display import display, HTML
+import numpy as np
+import io, base64
 
 class ModelReport(object):
     def __init__(self):
@@ -69,7 +73,6 @@ class ModelReport(object):
         self.macro_avg = metrics_dict["macro avg"]
         self.weighted_avg = metrics_dict['weighted avg']
 
-
     def _display_titles(self):
         model_title = "Model 1"
 
@@ -77,7 +80,7 @@ class ModelReport(object):
                         <h2 style='margin-bottom:-10px;'>Performance Report: {model_title}</h2>
                         </div>"""
 
-        display(HTML(HTML_title))
+        # display(HTML(HTML_title))
 
         ###### Subtitle
         model_info = "BERT with 10 epochs of traning, default train params"
@@ -85,8 +88,8 @@ class ModelReport(object):
                         <h3 style='margin-bottom:1px;'>{model_info}</h2>
                         </div>"""
 
-        display(HTML(HTML_subtitle))
-
+        # display(HTML(HTML_subtitle))
+        return HTML_title, HTML_subtitle
 
     def _display_cm_abs_plot(self, return_img=True):
         
@@ -104,11 +107,19 @@ class ModelReport(object):
         if not return_img:
             plt.plot()
         else:
+            cm_disp.plot(cmap="Blues", values_format=".1f", colorbar=False, ax=ax);
+
             buf = io.BytesIO()
+
             fig.savefig(buf, format='png', bbox_inches='tight', dpi=300)
+
             buf.seek(0)
-            img2 = base64.b64encode(buf.read()).decode('utf-8')
-            return img2
+
+            # Why is there plt.close() twice you ask, well me too. only way it works though otherwise pyjupter craete additional empty plot in cell
+            plt.close()
+            cm_base64 = base64.b64encode(buf.read()).decode('utf-8')
+            plt.close()
+            return cm_base64
 
     def _display_cpu_usage_plot(self):
 
@@ -151,18 +162,27 @@ class ModelReport(object):
 
         # Layout
         fig.update_layout(
-            title='Delta CPU Usage While Predicting',
             xaxis_title='Time',
             yaxis_title='Delta PU Usage (%)',
             hovermode='x unified',
+            autosize=True,
             plot_bgcolor="rgba(31,119,180,0.1)",
             template='plotly',  # matches VSCode dark theme
+            margin=dict(l=130, r=10, t=50, b=30),
             legend=dict(x=0.01, y=0.99, bgcolor='rgba(255,255,255,0.5)')
             
         )
-        fig.show()
+        fig.update_layout(
+            title={
+                'text': "Delta CPU Usage While Predicting",
+                'x': 0.5,  # Center horizontally
+                'xanchor': 'center',
+                'yanchor': 'top'
+            }
+        )
+        return fig
 
-    def _display_cm_rel_plot(self):
+    def _display_cm_rel_plot(self, return_img=True):
         fig, ax = plt.subplots()
 
         ax.set_title("Confusion Matrix (Normalize Per True Label)")
@@ -174,38 +194,51 @@ class ModelReport(object):
                                             )
 
         cm_disp.plot(ax=ax, cmap="Blues", values_format=".1f", colorbar=False)
-        plt.plot()
+        
+        if not return_img:
+            plt.plot()
+        else:
+            cm_disp.plot(cmap="Blues", values_format=".1f", colorbar=False, ax=ax);
 
+            buf = io.BytesIO()
+
+            fig.savefig(buf, format='png', bbox_inches='tight', dpi=300)
+
+            buf.seek(0)
+
+            # Why is there plt.close() twice you ask, well me too. only way it works though otherwise pyjupter craete additional empty plot in cell
+            plt.close()
+            cm_base64 = base64.b64encode(buf.read()).decode('utf-8')
+            plt.close()
+            return cm_base64
 
     def _display_metrics(self):
+
         table_style = [
-        {'selector': 'caption',
-         'props': [('caption-side', 'top'),
-                   ('font-size', '18px'),
-                   ('font-weight', 'bold'),
-                   ('padding', '10px 0')]},       # Header cells
-        {'selector': 'th',
-         'props': [('background-color', '#2c3e50'),
-                   ('color', 'white'),
-                   ('font-size', '14px'),
-                   ('text-align', 'center'),
-                   ('padding', '8px 16px')]},  # ← padding here
-
-        # Data cells
-        {'selector': 'td',
-         'props': [('font-size', '13px'),
-                   ('text-align', 'center'),
-                   ('padding', '12px 18px')]},  # ← padding here
-
-        # Table borders and spacing
-        {'selector': 'table',
-         'props': [('border-collapse', 'separate'),
-                   ('border-spacing', '0 6px')]},  # spacing between rows
-        {'selector': 'table',
-            'props': [('margin-left', 'auto'),
-                    ('margin-right', 'auto'),
-                    ('text-align', 'center')]}
+            {'selector': 'caption',
+            'props': [('caption-side', 'top'),
+                    ('font-size', '18px'),
+                    ('font-weight', 'bold'),
+                    ('padding', '10px 0')]},
+            {'selector': 'th',
+            'props': [('background-color', '#2c3e50'),
+                    ('color', 'white'),
+                    ('font-size', '14px'),
+                    ('text-align', 'center'),
+                    ('padding', '8px 16px')]},   # smaller padding
+            {'selector': 'td',
+            'props': [('font-size', '13px'),
+                    ('text-align', 'center'),
+                    ('padding', '12px 18px')]},   # smaller padding
+            {'selector': 'table',
+            'props': [('border-collapse', 'separate'),
+                    ('border-spacing', '0 6px'),
+                    ('table-layout', 'fixed'),  # <-- fixed layout
+                    ('width', '100%'),
+                    ('margin-left', '10px'),
+                    ('margin-right', '10px')]}          # <-- always fill cell
         ]
+        
 
         ###### Metric per label
         metric_per_label_df = pd.DataFrame(self.metric_per_label).T
@@ -219,7 +252,7 @@ class ModelReport(object):
             })
 
 
-        display(metric_per_label_df_styled)
+        # display(metric_per_label_df_styled)
 
         ###### Accuracy
         pd.DataFrame([{"Accuracy": self.accuracy}]).T
@@ -233,7 +266,7 @@ class ModelReport(object):
                 "support": "{:,.0f}"        
             })
 
-        display(accuracy_df_styled)
+        # display(accuracy_df_styled)
 
         ###### weighted and macro average
         weighted_and_macro_avg_df = pd.DataFrame({"Weighted Average": self.weighted_avg, "Macro Average": self.macro_avg}).T
@@ -245,12 +278,78 @@ class ModelReport(object):
                 "support": "{:,.0f}"        
             })
 
-        display(weighted_and_macro_avg_df_styled)
+        # display(weighted_and_macro_avg_df_styled)
 
+        return metric_per_label_df_styled,  weighted_and_macro_avg_df_styled, accuracy_df_styled
 
+    def _display_mem_usage_plot(self):
+        
+        mem_records_df = pd.DataFrame(list(self.memory_records.items()), columns=["TimeDelta", "MemUsage"])
+        # only get mem usage delta
+        mem_usage_t0 = mem_records_df[mem_records_df["TimeDelta"] == 0]["MemUsage"][0]
+        mem_records_df["MemUsageDelta"] = mem_records_df["MemUsage"] - mem_usage_t0
+        # convert mem usage to MB
+        mem_records_df["MemUsageDeltaMB"] = mem_records_df["MemUsageDelta"] / (1024 * 1024)
 
+        time = mem_records_df["TimeDelta"]
+        mem_usage = mem_records_df["MemUsageDeltaMB"]
 
-    def show_report(self):
+        # Find peak Mem usage
+        # import pdb; pdb.set_trace()
+        peak_idx = mem_usage.idxmax()
+        peak_time = time.iloc[peak_idx]
+        peak_value = mem_usage.iloc[peak_idx]
+
+        # Create interactive plot
+        fig = go.Figure()
+
+        # CPU usage line
+        fig.add_trace(go.Scatter(
+            x=time,
+            y=mem_usage,
+            mode='lines+markers',
+            fill='tozeroy',            # adds shadow under the line
+            fillcolor='rgba(31,119,180,0.2)',  # semi-transparent fill
+            name='Delta Mem Usage MB',
+            line=dict(color="#2C51E1", width=2),
+            hovertemplate='Time: %{x}<br>CPU: %{y:.1f}%'
+        ))
+
+        # Highlight peak
+        fig.add_trace(go.Scatter(
+            x=[peak_time],
+            y=[peak_value],
+            mode='markers+text',
+            name='Peak Mem',
+            marker=dict(color='red', size=12, symbol='triangle-up'),
+            text=["Peak Mem"],
+            textposition='top center',
+            hovertemplate='Peak Mem at %{x}: %{y:.1f}%'
+        ))
+
+        # Layout
+        fig.update_layout(
+            xaxis_title='Time',
+            yaxis_title='Delta Mem Usage MB',
+            hovermode='x unified',
+            autosize=True,
+            plot_bgcolor="rgba(31,119,180,0.1)",
+            template='plotly',  
+            margin=dict(l=130, r=10, t=50, b=30),
+            legend=dict(x=0.01, y=0.99, bgcolor='rgba(255,255,255,0.5)')
+            
+        )
+        fig.update_layout(
+            title={
+                'text': "Delta Mem Usage While Predicting",
+                'x': 0.5,  # Center horizontally
+                'xanchor': 'center',
+                'yanchor': 'top'
+            }
+        )
+        return fig
+
+    def _show_report_shell(self):
         print(f"#####\t Report for Model: {self.model_title}\t\n")
 
         print("Metrics per label\n")
@@ -310,6 +409,71 @@ class ModelReport(object):
         plt.tight_layout()
         plt.show()
 
+    def show_report(self):
+        if self._is_in_jupyter_notebook():
+            self._show_report_jupiter()
+        else:
+            self._show_report_shell()
+   
+    def _is_in_jupyter_notebook(self):
+        try:
+            shell = get_ipython().__class__.__name__
+            if shell == 'ZMQInteractiveShell':
+                return True   # Jupyter notebook or JupyterLab
+            else:
+                return False  # Other environments (IPython terminal, standard Python)
+        except NameError:
+            return False       # Standard Python interpreter
+
+    def _show_report_jupiter(self):
+        
+        display(HTML("""
+        <style>
+        div.center_div {
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            width: 100%;
+        }
+        </style>
+        """))
+
+
+        HTML_title, HTML_subtitle = self._display_titles()
+        metric_per_label_df_styled,  weighted_and_macro_avg_df_styled, accuracy_df_styled = self._display_metrics()
+
+        cm_rel = self._display_cm_rel_plot()
+        cm_abs = self._display_cm_abs_plot()
+
+        cpu_fig = self._display_cpu_usage_plot()
+        cpu_plot = cpu_fig.to_html(include_plotlyjs='cdn', full_html=False)
+
+        mem_fig = self._display_mem_usage_plot()
+        mem_plot = mem_fig.to_html(include_plotlyjs='cdn', full_html=False)
+
+        # --- Combine in HTML grid ---
+        html = f"""
+            {HTML_title}
+        <br/>
+            {HTML_subtitle}
+            <br/>
+            <br/>
+        <div class="center_div">
+            <div style="display: grid; grid-template-columns: 470px 470px; grid-gap: 10px;">
+                <div style="padding:5px; overflow-x:auto; width:100%;">{metric_per_label_df_styled.to_html()}</div>
+                <div style="padding:5px; overflow-x:auto; width:100%;">{weighted_and_macro_avg_df_styled.to_html()}</div>
+                <div style="padding:5px; grid-column: span 2; width:100%;">{accuracy_df_styled.to_html()}</div>
+
+                <div style="padding:5px;"><img src="data:image/png;base64,{cm_abs}" style="width:100%"></div>
+                <div style="padding:5px;"><img src="data:image/png;base64,{cm_rel}" style="width:100%"></div>
+                <div style="grid-column: span 2;">{mem_plot}</div>
+                <div style="grid-column: span 2;">{cpu_plot}</div>
+            </div>
+        </div>
+        """
+
+        display(HTML(html))
 
 
 class ModelEvaluator(object):
@@ -408,7 +572,6 @@ class ModelEvaluator(object):
         report.cm = confusion_matrix(y_true,y_pred)
         return report
     
-
 @runtime_checkable
 class ModelEvalWrapperInterface(Protocol):
     """

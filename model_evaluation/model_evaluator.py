@@ -10,14 +10,38 @@ from typing import Protocol, runtime_checkable
 from models.config import AnnotationLabels
 import threading
 import matplotlib.pyplot as plt
+from IPython.display import display, HTML
+import pandas as pd
+import time
+import psutil
+import os
+import tracemalloc, time
+from sklearn.metrics import classification_report, confusion_matrix, balanced_accuracy_score
+from sklearn.metrics import ConfusionMatrixDisplay
+from sklearn.utils.multiclass import unique_labels
+from typing import Protocol, runtime_checkable
+from models.config import AnnotationLabels
+import threading
+import plotly.graph_objects as go
+import matplotlib.pyplot as plt
+import matplotlib.pyplot as plt
+import plotly.graph_objects as go
+from IPython.display import display, HTML
+import numpy as np
+import io, base64
+from matplotlib.gridspec import GridSpec
 
 
 class ModelReport(object):
     def __init__(self):
         
         self.model_title = None
-        self.metrics = None
-        
+        # self.metrics = None
+        self.metric_per_label = None
+        self.accuracy = None
+        self.macro_avg = None
+        self.weighted_avg = None
+
         # confusion matrix and its display labels 
         self.cm = None
         self.cm_display_labels = None
@@ -30,10 +54,216 @@ class ModelReport(object):
         # memory profling 
         self.memory_records = None
 
+    def add_classfication_report_dict(self, metrics_dict):
+        """ 
+
+        Args:
+            classification_report_dict (_type_): dict from sklearn classification_report
+        """
+        self.metric_per_label = {}
+        all_label_ids = [AnnotationLabels.label2id[l] for l in AnnotationLabels.label_names]
+        for label_id in all_label_ids:
+            self.metric_per_label[AnnotationLabels.id2label[label_id]] = metrics_dict[str(label_id)]
+
+        self.accuracy = metrics_dict["accuracy"]
+        self.macro_avg = metrics_dict["macro avg"]
+        self.weighted_avg = metrics_dict['weighted avg']
+
+
+    def _display_titles(self):
+        model_title = "Model 1"
+
+        HTML_title = f"""<div style="font-size:20px; line-height:1; margin-bottom:1px;">
+                        <h2 style='margin-bottom:-10px;'>Performance Report: {model_title}</h2>
+                        </div>"""
+
+        display(HTML(HTML_title))
+
+        ###### Subtitle
+        model_info = "BERT with 10 epochs of traning, default train params"
+        HTML_subtitle = f"""<div style=" line-height:1; margin-bottom:1px;">
+                        <h3 style='margin-bottom:1px;'>{model_info}</h2>
+                        </div>"""
+
+        display(HTML(HTML_subtitle))
+
+
+    def _display_cm_abs_plot(self, return_img=True):
+        
+        # create the subplot layout
+        fig, ax = plt.subplots()  # ax is the Axes
+
+        # abs values
+        ax.set_title("Confusion Matrix (Absolute values)")
+        cm_disp = ConfusionMatrixDisplay(confusion_matrix=self.cm, 
+                                            display_labels=[AnnotationLabels.id2label[i] for i in self.cm_display_labels]
+                                            )
+
+        cm_disp.plot(cmap="Blues", values_format=".1f", colorbar=False, ax=ax)
+        
+        if not return_img:
+            plt.plot()
+        else:
+            buf = io.BytesIO()
+            fig.savefig(buf, format='png', bbox_inches='tight', dpi=300)
+            buf.seek(0)
+            img2 = base64.b64encode(buf.read()).decode('utf-8')
+            return img2
+
+    def _display_cpu_usage_plot(self):
+
+        cpu_records_df = pd.DataFrame(list(self.cpu_usage_records.items()), columns=["TimeDelta", "CPUUsage"])
+
+        time = cpu_records_df["TimeDelta"]
+        cpu_usage = cpu_records_df["CPUUsage"]
+
+        # Find peak CPU usage
+        peak_idx = cpu_usage.idxmax()
+        peak_time = time.iloc[peak_idx]
+        peak_value = cpu_usage.iloc[peak_idx]
+
+        # Create interactive plot
+        fig = go.Figure()
+
+        # CPU usage line
+        fig.add_trace(go.Scatter(
+            x=time,
+            y=cpu_usage,
+            mode='lines+markers',
+            fill='tozeroy',            # adds shadow under the line
+            fillcolor='rgba(31,119,180,0.2)',  # semi-transparent fill
+            name='Delta CPU Usage (% - 100% = 1 Core)',
+            line=dict(color="#1B4EAC", width=2),
+            hovertemplate='Time: %{x}<br>CPU: %{y:.1f}%'
+        ))
+
+        # Highlight peak
+        fig.add_trace(go.Scatter(
+            x=[peak_time],
+            y=[peak_value],
+            mode='markers+text',
+            name='Peak CPU',
+            marker=dict(color='red', size=12, symbol='triangle-up'),
+            text=["Peak CPU"],
+            textposition='top center',
+            hovertemplate='Peak CPU at %{x}: %{y:.1f}%'
+        ))
+
+        # Layout
+        fig.update_layout(
+            title='Delta CPU Usage While Predicting',
+            xaxis_title='Time',
+            yaxis_title='Delta PU Usage (%)',
+            hovermode='x unified',
+            plot_bgcolor="rgba(31,119,180,0.1)",
+            template='plotly',  # matches VSCode dark theme
+            legend=dict(x=0.01, y=0.99, bgcolor='rgba(255,255,255,0.5)')
+            
+        )
+        fig.show()
+
+    def _display_cm_rel_plot(self):
+        fig, ax = plt.subplots()
+
+        ax.set_title("Confusion Matrix (Normalize Per True Label)")
+
+        normalize_per_label = self.cm.astype(float) / self.cm.sum(axis=1, keepdims=True) * 100 
+
+        cm_disp = ConfusionMatrixDisplay(confusion_matrix=normalize_per_label, 
+                                            display_labels=[AnnotationLabels.id2label[i] for i in self.cm_display_labels]
+                                            )
+
+        cm_disp.plot(ax=ax, cmap="Blues", values_format=".1f", colorbar=False)
+        plt.plot()
+
+
+    def _display_metrics(self):
+        table_style = [
+        {'selector': 'caption',
+         'props': [('caption-side', 'top'),
+                   ('font-size', '18px'),
+                   ('font-weight', 'bold'),
+                   ('padding', '10px 0')]},       # Header cells
+        {'selector': 'th',
+         'props': [('background-color', '#2c3e50'),
+                   ('color', 'white'),
+                   ('font-size', '14px'),
+                   ('text-align', 'center'),
+                   ('padding', '8px 16px')]},  # ← padding here
+
+        # Data cells
+        {'selector': 'td',
+         'props': [('font-size', '13px'),
+                   ('text-align', 'center'),
+                   ('padding', '12px 18px')]},  # ← padding here
+
+        # Table borders and spacing
+        {'selector': 'table',
+         'props': [('border-collapse', 'separate'),
+                   ('border-spacing', '0 6px')]},  # spacing between rows
+        {'selector': 'table',
+            'props': [('margin-left', 'auto'),
+                    ('margin-right', 'auto'),
+                    ('text-align', 'center')]}
+        ]
+
+        ###### Metric per label
+        metric_per_label_df = pd.DataFrame(self.metric_per_label).T
+
+        metric_per_label_df_styled = metric_per_label_df.style.set_caption("Metrics per Label") \
+            .set_table_styles(table_style).format({
+                "precision": "{:,.5f}",
+                "recall": "{:,.5f}",    
+                "f1-score": "{:,.5f}",       
+                "support": "{:,.0f}"        
+            })
+
+
+        display(metric_per_label_df_styled)
+
+        ###### Accuracy
+        pd.DataFrame([{"Accuracy": self.accuracy}]).T
+
+        accuracy_df = pd.DataFrame([{"Accuracy": self.accuracy}]).T
+        accuracy_df_styled = accuracy_df.style.hide(axis=1).set_caption("Accuracy") \
+            .set_table_styles(table_style).format({
+                "precision": "{:,.5f}",
+                "recall": "{:,.5f}",    
+                "f1-score": "{:,.5f}",       
+                "support": "{:,.0f}"        
+            })
+
+        display(accuracy_df_styled)
+
+        ###### weighted and macro average
+        weighted_and_macro_avg_df = pd.DataFrame({"Weighted Average": self.weighted_avg, "Macro Average": self.macro_avg}).T
+        weighted_and_macro_avg_df_styled = weighted_and_macro_avg_df.style.set_caption("Weighted and Macro Avg") \
+            .set_table_styles(table_style).format({
+                "precision": "{:,.5f}",
+                "recall": "{:,.5f}",    
+                "f1-score": "{:,.5f}",       
+                "support": "{:,.0f}"        
+            })
+
+        display(weighted_and_macro_avg_df_styled)
+
+
+
+
     def show_report(self):
         print(f"#####\t Report for Model: {self.model_title}\t\n")
 
-        print(self.metrics)
+        print("Metrics per label\n")
+        print(pd.DataFrame(self.metric_per_label))
+
+        print(f"\nAccuracy: {self.accuracy}\n")
+
+        print("\nMacro Average\n")
+        print(pd.DataFrame([self.macro_avg]).to_string(index=False))
+
+
+        print("\nWeighted Average\n")
+        print(pd.DataFrame([self.weighted_avg]).to_string(index=False))
     
         print(f"The model took {self.model_runtime:.5f} seconds to run\n")
         print(f"Average time per prediction {self.avg_time_per_prediction:.5f} seconds\n")
@@ -169,8 +399,9 @@ class ModelEvaluator(object):
 
         y_pred, report = self._predict_and_profile(report=report)
 
-#        report.metrics = classification_report(y_true=y_true, y_pred=y_pred, output_dict=True)
-        report.metrics = classification_report(y_true=y_true, y_pred=y_pred)
+        metrics_dict = classification_report(y_true=y_true, y_pred=y_pred, output_dict=True)
+
+        report.add_classfication_report_dict(metrics_dict)
 
         # Confusion matrix
         report.cm_display_labels = unique_labels(y_true, y_pred)

@@ -11,7 +11,7 @@ class EmbedderClassifier(object):
         return self._embedder_model.encode(sentences) 
     
     def train(self, train_XY):
-        embeddings = self._embed(train_XY["X"])
+        embeddings = self._embed(train_XY["protein_annotation"])
         self._classification_head.fit(embeddings, train_XY["y"])
 
     def predict(self, X):

@@ -40,6 +40,7 @@ class ModelReport(object):
     def __init__(self):
         
         self.model_title = None
+        self.model_info = None
         # self.metrics = None
         self.metric_per_label = None
         self.accuracy = None
@@ -74,7 +75,7 @@ class ModelReport(object):
         self.weighted_avg = metrics_dict['weighted avg']
 
     def _display_titles(self):
-        model_title = "Model 1"
+        model_title = self.model_title
 
         HTML_title = f"""<div style="font-size:20px; line-height:1; margin-bottom:1px;">
                         <h2 style='margin-bottom:-10px;'>Performance Report: {model_title}</h2>
@@ -83,7 +84,7 @@ class ModelReport(object):
         # display(HTML(HTML_title))
 
         ###### Subtitle
-        model_info = "BERT with 10 epochs of traning, default train params"
+        model_info = self.model_info
         HTML_subtitle = f"""<div style=" line-height:1; margin-bottom:1px;">
                         <h3 style='margin-bottom:1px;'>{model_info}</h2>
                         </div>"""
@@ -279,8 +280,17 @@ class ModelReport(object):
             })
 
         # display(weighted_and_macro_avg_df_styled)
-
-        return metric_per_label_df_styled,  weighted_and_macro_avg_df_styled, accuracy_df_styled
+        ###### run time df
+        runtime_df = pd.DataFrame([{"Runtime": self.model_runtime, "Avg time per prediction": self.avg_time_per_prediction}]).T
+        runtime_df_styled = runtime_df.style.hide(axis=1).set_caption("Runtime Stats") \
+            .set_table_styles(table_style).format({
+                "precision": "{:,.5f}",
+                "recall": "{:,.5f}",    
+                "f1-score": "{:,.5f}",       
+                "support": "{:,.0f}"        
+            })
+        
+        return metric_per_label_df_styled,  weighted_and_macro_avg_df_styled, accuracy_df_styled , runtime_df_styled
 
     def _display_mem_usage_plot(self):
         
@@ -441,7 +451,7 @@ class ModelReport(object):
 
 
         HTML_title, HTML_subtitle = self._display_titles()
-        metric_per_label_df_styled,  weighted_and_macro_avg_df_styled, accuracy_df_styled = self._display_metrics()
+        metric_per_label_df_styled,  weighted_and_macro_avg_df_styled, accuracy_df_styled, runtime_df_styled = self._display_metrics()
 
         cm_rel = self._display_cm_rel_plot()
         cm_abs = self._display_cm_abs_plot()
@@ -463,8 +473,10 @@ class ModelReport(object):
             <div style="display: grid; grid-template-columns: 470px 470px; grid-gap: 10px;">
                 <div style="padding:5px; overflow-x:auto; width:100%;">{metric_per_label_df_styled.to_html()}</div>
                 <div style="padding:5px; overflow-x:auto; width:100%;">{weighted_and_macro_avg_df_styled.to_html()}</div>
-                <div style="padding:5px; grid-column: span 2; width:100%;">{accuracy_df_styled.to_html()}</div>
+                <div style="padding:5px; width:100%;">{accuracy_df_styled.to_html()}</div>
 
+                <div style="padding:5px; width:100%;">{runtime_df_styled.to_html()}</div>
+                                
                 <div style="padding:5px;"><img src="data:image/png;base64,{cm_abs}" style="width:100%"></div>
                 <div style="padding:5px;"><img src="data:image/png;base64,{cm_rel}" style="width:100%"></div>
                 <div style="grid-column: span 2;">{mem_plot}</div>
@@ -558,7 +570,8 @@ class ModelEvaluator(object):
     def generate_report(self):
         report = ModelReport()     
         report.model_title = self.model.title
-
+        report.model_info = self.model.model_info
+        
         y_true = self.eval_dataset["label"]
 
         y_pred, report = self._predict_and_profile(report=report)
@@ -590,12 +603,14 @@ class ModelEvalWrapper(object):
     """
     Wrapping the pretrained model to send for evaluation
     """
-    def __init__(self, model, title):
+    def __init__(self, model, title, model_info=None):
         """
         :param model: Model to evaluate, the model should be already trained and implement the methods in  
         :param title: Title or label for this evaluation instance
+        :param model_info: more infomation abotu the model 
         """
         assert isinstance(model, ModelEvalWrapperInterface), "model must implement the ModelEvalWrapperInterface Protocol"
         self.model = model
         self.title = title
+        self.model_info = model_info
 

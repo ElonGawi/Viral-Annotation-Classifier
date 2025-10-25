@@ -40,6 +40,10 @@ import pickle
 from dash import Dash, dash_table, Input, Output, dcc, html
 import pandas as pd
 import numpy as np
+from dash import Dash, dcc, html, Input, Output
+import pandas as pd
+import numpy as np
+import plotly.express as px
 
 
 class ModelReport(object):
@@ -563,9 +567,86 @@ class ReportsComparison(object):
             report_dicts.append(ReportsComparison._get_report_dict(report))
         return pd.DataFrame(report_dicts)
     
-    def compare_and_show(self):
-        df = self.get_comparison_df()
+    def show_comparison_plot(self, df=None):
+        
+        if df is None:
+            df = self.get_comparison_df()
 
+        metrics = df.columns
+        # Initialize Dash app
+        app = Dash(__name__)
+
+        # Layout
+        app.layout = html.Div([
+            html.H4(
+                "Interactive Model Comparison Plot",
+                style={'textAlign': 'center', 'fontFamily': 'Arial', 'marginBottom': '20px'}
+            ),
+            
+            html.Div([
+                html.Div([
+                    html.Label("X-axis:", style={'fontFamily': 'Arial', 'fontWeight': 'bold', 'marginRight': '5px'}),
+                    dcc.Dropdown(
+                        id='x-axis-dropdown',
+                        options=[{"label": col, "value": col} for col in metrics],
+                        clearable=False,
+                        style={'width': '220px', 'fontFamily': 'Arial'}
+                    )
+                ], style={'display': 'inline-block', 'marginRight': '30px'}),
+                
+                html.Div([
+                    html.Label("Y-axis:", style={'fontFamily': 'Arial', 'fontWeight': 'bold', 'marginRight': '5px'}),
+                    dcc.Dropdown(
+                        id='y-axis-dropdown',
+                        options=[{"label": col, "value": col} for col in metrics],
+                        clearable=False,
+                        style={'width': '220px', 'fontFamily': 'Arial'}
+                    )
+                ], style={'display': 'inline-block'})
+            ], style={'textAlign': 'center', 'marginBottom': '20px'}),
+            
+            dcc.Graph(id='scatter-plot')
+        ], style={'fontFamily': 'Arial'})
+
+        # Callback to update scatter plot
+        @app.callback(
+            Output('scatter-plot', 'figure'),
+            Input('x-axis-dropdown', 'value'),
+            Input('y-axis-dropdown', 'value')
+        )
+        def update_scatter(x_col, y_col):
+            fig = px.scatter(
+                df,
+                x=x_col,
+                y=y_col,
+                text="Model",
+                hover_data=df.columns,
+                color="Model",
+                size_max=15
+            )
+            fig.update_traces(textposition='top center')
+            fig.update_layout(
+                xaxis_title=x_col,
+                yaxis_title=y_col,
+                height=500,
+                margin=dict(l=50, r=50, t=50, b=50),
+                font=dict(family="Arial", size=13)  # match font with dropdowns/table
+            )
+            return fig
+
+        # Run inline in Jupyter
+        app.run(mode='inline')
+
+    def show_comparison(self):
+        df = self.get_comparison_df()
+        self.show_comparison_table(df=df)
+        self.show_comparison_plot(df=df)
+
+
+    def show_comparison_table(self, df=None):
+
+        if df is None:
+            df = self.get_comparison_df()
         # Choose default metrics to show
         default_metrics = ["Accuracy", "Average Time Per Prediction", "Weighted Average (precision)"]
 

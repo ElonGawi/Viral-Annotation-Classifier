@@ -1,1 +1,1 @@
-from .model_evaluator import ModelEvaluator, ModelEvalWrapper, ModelEvalWrapperInterface
+from .model_evaluator import ModelEvaluator, ModelEvalWrapper, ModelEvalWrapperInterface, ModelReport, ReportsComparison

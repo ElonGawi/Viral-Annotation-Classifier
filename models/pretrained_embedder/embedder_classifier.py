@@ -12,7 +12,7 @@ class EmbedderClassifier(object):
     
     def train(self, train_XY):
         embeddings = self._embed(train_XY["protein_annotation"])
-        self._classification_head.fit(embeddings, train_XY["y"])
+        self._classification_head.fit(embeddings, train_XY["label"])
 
     def predict(self, X):
         embeddings = self._embed(X)

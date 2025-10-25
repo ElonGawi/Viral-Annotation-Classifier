@@ -35,6 +35,12 @@ import plotly.graph_objects as go
 from IPython.display import display, HTML
 import numpy as np
 import io, base64
+import json
+import pickle
+from dash import Dash, dash_table, Input, Output, dcc, html
+import pandas as pd
+import numpy as np
+
 
 class ModelReport(object):
     def __init__(self):
@@ -134,6 +140,8 @@ class ModelReport(object):
         peak_time = time.iloc[peak_idx]
         peak_value = cpu_usage.iloc[peak_idx]
 
+        mean_value = cpu_usage.mean()
+
         # Create interactive plot
         fig = go.Figure()
 
@@ -145,8 +153,10 @@ class ModelReport(object):
             fill='tozeroy',            # adds shadow under the line
             fillcolor='rgba(31,119,180,0.2)',  # semi-transparent fill
             name='Delta CPU Usage (% - 100% = 1 Core)',
-            line=dict(color="#1B4EAC", width=2),
+            line=dict(color="#1B4EAC", width=1.5),
+            marker=dict(size=2),  
             hovertemplate='Time: %{x}<br>CPU: %{y:.1f}%'
+
         ))
 
         # Highlight peak
@@ -160,6 +170,22 @@ class ModelReport(object):
             textposition='top center',
             hovertemplate='Peak CPU at %{x}: %{y:.1f}%'
         ))
+
+        # Add average line
+        fig.add_hline(y=mean_value, line_dash="3px,3px",                     
+                        line_color="rgba(200, 0, 0, 0.8)",     
+                        line_width=1.5,
+                        annotation_text=f"Mean usage: {mean_value:.2f}%",
+                        annotation_position="top left",
+                        annotation=dict(
+                        font=dict(color="rgba(200, 0, 0, 0.8)"), 
+                        bgcolor="rgba(255,255,255,0.8)",  
+                       
+                        borderpad=4,
+                        borderwidth=1,
+                        showarrow=False
+                    ))
+        
 
         # Layout
         fig.update_layout(
@@ -281,7 +307,7 @@ class ModelReport(object):
 
         # display(weighted_and_macro_avg_df_styled)
         ###### run time df
-        runtime_df = pd.DataFrame([{"Runtime": self.model_runtime, "Avg time per prediction": self.avg_time_per_prediction}]).T
+        runtime_df = pd.DataFrame([{"Runtime (seconds)": self.model_runtime, "Avg time per prediction (seconds)": self.avg_time_per_prediction}]).T
         runtime_df_styled = runtime_df.style.hide(axis=1).set_caption("Runtime Stats") \
             .set_table_styles(table_style).format({
                 "precision": "{:,.5f}",
@@ -305,10 +331,11 @@ class ModelReport(object):
         mem_usage = mem_records_df["MemUsageDeltaMB"]
 
         # Find peak Mem usage
-        # import pdb; pdb.set_trace()
         peak_idx = mem_usage.idxmax()
         peak_time = time.iloc[peak_idx]
         peak_value = mem_usage.iloc[peak_idx]
+
+        mean_value = mem_usage.mean()
 
         # Create interactive plot
         fig = go.Figure()
@@ -321,7 +348,8 @@ class ModelReport(object):
             fill='tozeroy',            # adds shadow under the line
             fillcolor='rgba(31,119,180,0.2)',  # semi-transparent fill
             name='Delta Mem Usage MB',
-            line=dict(color="#2C51E1", width=2),
+            line=dict(color="#2C51E1", width=1.5),
+            marker=dict(size=2),
             hovertemplate='Time: %{x}<br>CPU: %{y:.1f}%'
         ))
 
@@ -336,6 +364,22 @@ class ModelReport(object):
             textposition='top center',
             hovertemplate='Peak Mem at %{x}: %{y:.1f}%'
         ))
+
+
+        
+        fig.add_hline(y=mean_value, line_dash="3px,3px",                     
+                line_color="rgba(200, 0, 0, 0.8)",     
+                line_width=1.5,
+                annotation_text=f"Mean usage: {mean_value:.2f} MB",
+                annotation_position="top left",
+                annotation=dict(
+                font=dict(color="rgba(200, 0, 0, 0.75)"), 
+                bgcolor="rgba(255,255,255,0.8)",  
+
+                borderpad=4,
+                borderwidth=1,
+                showarrow=False
+            ))
 
         # Layout
         fig.update_layout(
@@ -487,6 +531,151 @@ class ModelReport(object):
 
         display(HTML(html))
 
+    def save_to_file(self, path):
+        with open(path, "wb") as f:
+           pickle.dump(self, f)
+
+    def load_report(path):
+        with open(path, "rb") as f:
+            return pickle.load(f)
+
+class ReportsComparison(object):
+    def __init__(self, reports):
+        self._reports = reports
+
+    def _get_report_dict(report):
+        report_dict = {"Model" : report.model_title, 
+               "Accuracy": report.accuracy,
+               "Average Time Per Prediction": report.avg_time_per_prediction
+        }
+
+        for macro_avg_item in report.macro_avg.keys():
+            report_dict[f"Macro Average ({macro_avg_item})"] =  report.macro_avg[macro_avg_item]
+
+        for weighted_avg_item in report.weighted_avg.keys():
+            report_dict[f"Weighted Average ({weighted_avg_item})"] =  report.weighted_avg[weighted_avg_item]
+
+        return report_dict
+
+    def get_comparison_df(self):
+        report_dicts = []
+        for report in self._reports:
+            report_dicts.append(ReportsComparison._get_report_dict(report))
+        return pd.DataFrame(report_dicts)
+    
+    def compare_and_show(self):
+        df = self.get_comparison_df()
+
+        # Choose default metrics to show
+        default_metrics = ["Accuracy", "Average Time Per Prediction", "Weighted Average (precision)"]
+
+        # Initialize Dash app
+        app = Dash(__name__)
+
+        # Layout with styled checklist and default selected columns
+        app.layout = html.Div([
+            html.Div([
+                html.H4(
+                    "Select Metrics to Display:",
+                    style={'textAlign': 'center', 'fontFamily': 'Arial, sans-serif', 'marginBottom': '8px'}
+                ),
+                dcc.Checklist(
+                    id='column-selector',
+                    options=[{"label": col, "value": col} for col in df.columns if col not in ["Model"]],
+                    value=default_metrics,
+                    inline=False,  # disable inline to allow wrapping
+                    inputStyle={"transform": "scale(1.5)", "margin-right": "6px", "margin-left": "10px"},
+                    labelStyle={
+                        "margin": "5px",
+                        'fontFamily': 'Arial, sans-serif',
+                        'fontSize': '14px',
+                        'fontWeight': 'bold',
+                        'color': '#333',
+                        'display': 'inline-block',
+                        'width': '150px'  # adjust width to control number per row
+                    },
+                    style={'display': 'flex', 'flexWrap': 'wrap', 'justifyContent': 'left'}
+                )
+            ], style={
+                'textAlign': 'center',
+                'padding': '10px',
+                'backgroundColor': '#f9f9f9',
+                'borderRadius': '8px',
+                'marginBottom': '15px',
+                'display': 'inline-block'
+            }),
+            
+            dash_table.DataTable(
+                id='model-metrics-table',
+                data=df.to_dict('records'),
+                sort_action="native",
+                sort_mode="single",
+                style_table={'width': 'auto', 'height': '400px', 'overflowX': 'auto', 'overflowY': 'auto', 'margin': 'auto'},
+                style_cell={
+                    'textAlign': 'center',
+                    'padding': '4px',
+                    'minWidth': '40px',
+                    'width': 'auto',
+                    'maxWidth': '150px',
+                    'whiteSpace': 'normal',
+                    'fontSize': '13px',
+                    'lineHeight': '15px',
+                    'fontFamily': 'Arial, sans-serif'
+                },
+                style_header={
+                    'backgroundColor': '#f0f0f0',
+                    'fontWeight': 'bold',
+                    'textAlign': 'center',
+                    'fontSize': '14px',
+                    'height': '30px',
+                    'fontFamily': 'Arial, sans-serif'
+                },
+                style_header_conditional=[]
+            )
+        ])
+
+        # Callback to update table columns dynamically and highlight sorted header
+        @app.callback(
+            Output('model-metrics-table', 'columns'),
+            Output('model-metrics-table', 'style_header_conditional'),
+            Input('model-metrics-table', 'sort_by'),
+            Input('column-selector', 'value')
+        )
+        def update_table_columns(sort_by, selected_metrics):
+            displayed_columns = ["Model"] + selected_metrics
+            new_columns = []
+            style_header_conditional = []
+
+            numeric_cols = df.select_dtypes(include='number').columns
+
+
+            for col in displayed_columns:
+                col_name = col
+                
+                col_dict = {"name": col_name, "id": col}
+
+                # Add numeric formatting if column is numeric
+                if col in numeric_cols:
+                    col_dict["type"] = "numeric"
+                    col_dict["format"] = {'specifier': '.5f'}
+
+                if sort_by and col == sort_by[0]['column_id']:
+                    direction = sort_by[0]['direction']
+                    col_name = f"{col} ({direction})"
+                    color = '#d1e7dd' if direction == 'asc' else '#f8d7da'
+                    style_header_conditional.append({
+                        'if': {'column_id': col},
+                        'backgroundColor': color
+                    })
+                new_columns.append(col_dict)
+
+            return new_columns, style_header_conditional
+
+        # Run inline in Jupyter
+        app.run(mode='inline')
+
+    
+
 
 class ModelEvaluator(object):
     def __init__(self, model, eval_dataset):
@@ -585,6 +774,7 @@ class ModelEvaluator(object):
         report.cm = confusion_matrix(y_true,y_pred)
         return report
     
+
 @runtime_checkable
 class ModelEvalWrapperInterface(Protocol):
     """

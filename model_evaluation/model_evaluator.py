@@ -691,7 +691,7 @@ class ReportsComparison(object):
                 data=df.to_dict('records'),
                 sort_action="native",
                 sort_mode="single",
-                style_table={'width': 'auto', 'height': '400px', 'overflowX': 'auto', 'overflowY': 'auto', 'margin': 'auto'},
+                style_table={'width': 'auto', 'overflowX': 'auto', 'overflowY': 'auto', 'margin': 'auto'},
                 style_cell={
                     'textAlign': 'center',
                     'padding': '4px',
@@ -753,7 +753,8 @@ class ReportsComparison(object):
             return new_columns, style_header_conditional
 
         # Run inline in Jupyter
-        app.run(mode='inline')
+        frame_height = 200 + (50 * len(df)) if (200 + (50 * len(df))) < 1000 else 1000
+        app.run(mode='inline', jupyter_height= frame_height)
 
     
 

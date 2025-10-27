@@ -1,32 +1,34 @@
 import re
 import spacy
+import pickle
 from sklearn.feature_extraction.text import TfidfVectorizer, ENGLISH_STOP_WORDS
 from sklearn.linear_model import LogisticRegression
-import pickle
-
+from sklearn.svm import LinearSVC
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.naive_bayes import MultinomialNB, ComplementNB
 
 class TFIDFClassifier:
     def __init__(self):
         self._lemmatizer = spacy.load("en_core_web_sm", disable=["parser", "ner", "textcat"])
-        self.clf = LogisticRegression(solver="lbfgs", max_iter=1000, penalty='l2', C=13.1451)
-        self.vectorizer = TfidfVectorizer(lowercase=False, stop_words=list(ENGLISH_STOP_WORDS), ngram_range=(1,2), max_df=0.9)
+        self._clf =  RandomForestClassifier(bootstrap=True, class_weight='balanced', max_depth=10, max_features='sqrt', min_samples_leaf=2, min_samples_split=11, n_estimators=910, random_state=42, n_jobs=-1)
+        self._vectorizer = TfidfVectorizer(lowercase=False, stop_words=list(ENGLISH_STOP_WORDS), ngram_range=(1,2), max_df=0.9)
 
 
     def predict(self, X):
-        train = X.apply(self._clean_lemmatize)
-        vectors = self.vectorizer.transform(train)
-        return self.clf.predict(vectors)
+        train = X.apply(self.clean_lemmatize)
+        vectors = self._vectorizer.transform(train)
+        return self._clf.predict(vectors)
     
 
     def fit(self, train_df):
-        train = train_df["protein_annotation"].apply(self._clean_lemmatize)
+        train = train_df["protein_annotation"].apply(self.clean_lemmatize)
         labels = train_df["label"]
 
-        vectors = self.vectorizer.fit_transform(train)
-        self.clf.fit(vectors, labels)
+        vectors = self._vectorizer.fit_transform(train)
+        self._clf.fit(vectors, labels)
 
 
-    def _clean_lemmatize(self, text):
+    def clean_lemmatize(self, text):
         text = text.lower()  # Lowercase
         text = re.sub(r"[\[\]\(\)]", "", text)  # removing brackets etc
         text = re.sub(r"[^a-zA-Z0-9]+", " ", text)  # remove non-alphanumeric characters

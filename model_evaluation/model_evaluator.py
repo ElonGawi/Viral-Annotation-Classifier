@@ -48,7 +48,10 @@ import plotly.express as px
 
 class ModelReport(object):
     def __init__(self):
-        
+
+        self.eval_df = None
+        self.y_preds = None
+
         self.model_title = None
         self.model_info = None
         # self.metrics = None
@@ -543,6 +546,24 @@ class ModelReport(object):
         with open(path, "rb") as f:
             return pickle.load(f)
 
+    def show_misclassified_samples(self, true_label_to_filter=None):
+
+        merged_df = pd.DataFrame({
+        "protein_annotation": self.eval_df["protein_annotation"],
+        "true_label": self.eval_df["label"],
+        "predicted_label": self.y_preds
+        })
+
+        miscalssified_df = merged_df[merged_df["true_label"] != merged_df["predicted_label"]]
+
+        if true_label_to_filter:
+            return miscalssified_df[miscalssified_df["true_label"] == true_label_to_filter]
+
+        else:
+            return miscalssified_df
+        
+
+
 class ReportsComparison(object):
     def __init__(self, reports):
         self._reports = reports
@@ -641,7 +662,6 @@ class ReportsComparison(object):
         df = self.get_comparison_df()
         self.show_comparison_table(df=df)
         self.show_comparison_plot(df=df)
-
 
     def show_comparison_table(self, df=None):
 
@@ -767,13 +787,15 @@ class ModelEvaluator(object):
             model (ModelEvalWrapper): model to evaluate
             eval_dataset (Dataframe): dataset to evaluate on, should have 2 columns "protein_annotation"  and "label"
         """
-        assert isinstance(model, ModelEvalWrapper), "Model must be of a ModelEvalWrapper class"
+        assert isinstance(model, ModelEvalPredictInterface), "Model must be of a ModelEvalPredictInterface "
+        assert isinstance(model, ModelEvalInfoInterface), "Model must be of a ModelEvalInfoInterface"
+
         self.model = model
         self.eval_dataset = eval_dataset
 
 
     def _predict(self): 
-        return self.model.model.predict(self.eval_dataset["protein_annotation"])
+        return self.model.predict(self.eval_dataset["protein_annotation"])
     
 
     def _profile(interval=0.01):
@@ -840,13 +862,16 @@ class ModelEvaluator(object):
 
     def generate_report(self):
         report = ModelReport()     
-        report.model_title = self.model.title
+        report.model_title = self.model.model_title
         report.model_info = self.model.model_info
         
+        report.eval_df = self.eval_dataset 
+
         y_true = self.eval_dataset["label"]
 
         y_pred, report = self._predict_and_profile(report=report)
 
+        report.y_preds = y_pred 
         metrics_dict = classification_report(y_true=y_true, y_pred=y_pred, output_dict=True)
 
         report.add_classfication_report_dict(metrics_dict)
@@ -857,8 +882,18 @@ class ModelEvaluator(object):
         return report
     
 
+
 @runtime_checkable
-class ModelEvalWrapperInterface(Protocol):
+class ModelEvalInfoInterface(Protocol):
+    """
+    An interface for the model evaluator. 
+    Implementing this interface is required for evaluating the model using ModelEvaluator
+    """
+    model_title: str
+    model_info: str
+
+@runtime_checkable
+class ModelEvalPredictInterface(Protocol):
     """
     An interface for the model evaluator. 
     Implementing this interface is required for evaluating the model using ModelEvaluator
@@ -871,18 +906,44 @@ class ModelEvalWrapperInterface(Protocol):
         pass
 
 
+@runtime_checkable
+class ModelEvalWrapperInterface(Protocol):
+    """
+    An interface for the model evaluator. 
+    Implementing this interface is required for evaluating the model using ModelEvaluator
+    """
+    model_title: str
+    model_info: str
+
+    def predict(X):
+        """
+        :param X: a dataframe with X to prredict
+        :returns the predictions as a dataframe
+        """
+        pass
+
+
 class ModelEvalWrapper(object):
     """
     Wrapping the pretrained model to send for evaluation
     """
-    def __init__(self, model, title, model_info=None):
+    def __init__(self, model, title, model_info=""):
         """
         :param model: Model to evaluate, the model should be already trained and implement the methods in  
         :param title: Title or label for this evaluation instance
         :param model_info: more infomation abotu the model 
         """
-        assert isinstance(model, ModelEvalWrapperInterface), "model must implement the ModelEvalWrapperInterface Protocol"
+        assert isinstance(model, ModelEvalPredictInterface), "model must implement the ModelEvalWrapperInterface Protocol"
+
         self.model = model
-        self.title = title
+        self.model_title = title
         self.model_info = model_info
 
+        if isinstance(model, ModelEvalInfoInterface):
+            print("Both the model and Model Wrapper contains model_title and model_info properties, will concat these!")
+            self.model_title = "  |  ".join([self.model_title, self.model.model_title])
+            self.model_info = "  |  ".join([self.model_info, self.model.model_info])
+
+    
+    def predict(self, *args, **kwargs):
+        return self.model.predict(*args, **kwargs)

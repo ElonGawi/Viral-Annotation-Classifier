@@ -44,6 +44,11 @@ from dash import Dash, dcc, html, Input, Output
 import pandas as pd
 import numpy as np
 import plotly.express as px
+import dash
+from dash import dcc, html, Input, Output, Dash, ctx # 'ctx' is needed again
+import plotly.express as px
+import pandas as pd
+import numpy as np
 
 
 class ModelReport(object):
@@ -569,7 +574,8 @@ class ReportsComparison(object):
         self._reports = reports
 
     def _get_report_dict(report):
-        report_dict = {"Model" : report.model_title, 
+        report_dict = {"Model" : report.model_title,
+                       "Model_info":  report.model_info,
                "Accuracy": report.accuracy,
                "Average Time Per Prediction": report.avg_time_per_prediction
         }
@@ -588,7 +594,7 @@ class ReportsComparison(object):
             report_dicts.append(ReportsComparison._get_report_dict(report))
         return pd.DataFrame(report_dicts)
     
-    def show_comparison_plot(self, df=None):
+    def show_comparison_plot_old(self, df=None):
         
         if df is None:
             df = self.get_comparison_df()
@@ -657,6 +663,158 @@ class ReportsComparison(object):
 
         # Run inline in Jupyter
         app.run(mode='inline')
+
+    def show_comparison_plot(self, df=None):
+        
+        if df is None:
+            df = self.get_comparison_df()
+
+        metrics = df.columns
+                # Filter metrics to only include numeric types for plotting
+        numeric_metrics = [col for col in df.columns if np.issubdtype(df[col].dtype, np.number)]
+
+        # Initialize Dash app
+        app = Dash(__name__)
+
+        # Layout
+        app.layout = html.Div([
+            # NEW: Hidden store to signal when dropdowns have changed
+            dcc.Store(id='store-reset-signal'),
+
+            html.H4(
+                "Interactive Model Comparison Plot",
+                style={'textAlign': 'center', 'fontFamily': 'Arial', 'marginBottom': '20px'}
+            ),
+            
+            html.Div([
+                html.Div([
+                    html.Label("X-axis:", style={'fontFamily': 'Arial', 'fontWeight': 'bold', 'marginRight': '5px'}),
+                    dcc.Dropdown(
+                        id='x-axis-dropdown',
+                        options=[{"label": col, "value": col} for col in numeric_metrics],
+                        value=numeric_metrics[0] if numeric_metrics else None, # Set initial value
+                        clearable=False,
+                        style={'width': '220px', 'fontFamily': 'Arial'}
+                    )
+                ], style={'display': 'inline-block', 'marginRight': '30px'}),
+                
+                html.Div([
+                    html.Label("Y-axis:", style={'fontFamily': 'Arial', 'fontWeight': 'bold', 'marginRight': '5px'}),
+                    dcc.Dropdown(
+                        id='y-axis-dropdown',
+                        options=[{"label": col, "value": col} for col in numeric_metrics],
+                        value=numeric_metrics[1] if len(numeric_metrics) > 1 else None, # Set initial value
+                        clearable=False,
+                        style={'width': '220px', 'fontFamily': 'Arial'}
+                    )
+                ], style={'display': 'inline-block'})
+            ], style={'textAlign': 'center', 'marginBottom': '20px'}),
+            
+            # MODIFICATION: Put Graph inside its own Div container
+            html.Div(
+                dcc.Graph(
+                    id='scatter-plot',
+                    style={'height': '500px'}
+                ),
+                id='graph-container'
+            ),
+            
+            # Scrollable details box
+            html.Div([
+                html.H5("Model Details", style={'fontFamily': 'Arial', 'textAlign': 'center', 'margin': '5px'}),
+                dcc.Markdown(
+                    id='model-details',
+                    children="Click on a point to see model details.", # Back to 'Click'
+                    # These style properties make the box scrollable
+                    style={
+                        'fontFamily': 'Arial',
+                        'padding': '10px 15px',
+                        'border': '1px solid #ccc',
+                        'borderRadius': '5px',
+                        'height': '250px',
+                        'overflowY': 'scroll',
+                        'backgroundColor': '#f9f9f9',
+                        'boxSizing': 'border-box'
+                    }
+                )
+            ], style={'paddingTop': '20px', 'boxSizing': 'border-box'}), 
+                
+        ], style={'fontFamily': 'Arial', 'padding': '20px'})
+
+        # MODIFIED CALLBACK: Updates plot AND sends a reset signal
+        @app.callback(
+            Output('scatter-plot', 'figure'),
+            Output('store-reset-signal', 'data'), # NEW Output
+            Input('x-axis-dropdown', 'value'),
+            Input('y-axis-dropdown', 'value')
+        )
+        def update_scatter(x_col, y_col):
+            # Handle case where dropdowns might not be populated yet
+            if not x_col or not y_col:
+                return {}, 'reset'
+                
+            fig = px.scatter(
+                df,
+                x=x_col,
+                y=y_col,
+                text="Model",
+                hover_data=["Model", "Accuracy"], 
+                color="Model",
+                custom_data=[df.index], # MODIFICATION: Pass the original DF index
+                size_max=15
+            )
+            fig.update_traces(textposition='top center')
+            fig.update_layout(
+                xaxis_title=x_col,
+                yaxis_title=y_col,
+                margin=dict(l=50, r=50, t=50, b=50),
+                font=dict(family="Arial", size=13) 
+            )
+            # Return figure AND a signal to the store
+            return fig, 'reset' 
+
+        # MODIFIED CALLBACK: Responds to click OR reset signal
+        @app.callback(
+            Output('model-details', 'children'),
+            Input('scatter-plot', 'clickData'), # Back to 'clickData'
+            Input('store-reset-signal', 'data') # NEW Input
+        )
+        def display_click_data(clickData, reset_signal):
+            # Check which input triggered this callback
+            triggered_id = ctx.triggered_id
+            
+            # If the reset-signal changed, reset the text
+            if triggered_id == 'store-reset-signal':
+                return "Click on a point to see model details."
+            
+            # This is the default message if no point is clicked
+            if clickData is None:
+                return "Click on a point to see model details."
+
+            # Process the click data
+            try:
+                # MODIFICATION: Get the original index from customdata
+                original_index = clickData['points'][0]['customdata'][0]
+            except (KeyError, IndexError):
+                return "Click on a point to see model details."
+
+            # Get all data for that point using the original index with .loc
+            model_data = df.loc[original_index]
+            
+            # Format the data as a Markdown string
+            details_md = f"### {model_data['Model']}\n\n"
+            details_md += "```\n"
+            for col, val in model_data.items():
+                if col != 'Model': # Already in the title
+                    details_md += f"{col}:\n{val}\n\n"
+            details_md += "```"
+            
+            return details_md
+
+        # Standard way to run the app
+        app.run(mode="inline", jupyter_height= 1000)
+
+
 
     def show_comparison(self):
         df = self.get_comparison_df()

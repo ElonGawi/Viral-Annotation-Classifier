@@ -7,10 +7,9 @@ from .embedders.embedders import AnnotationEmbedder
 from sklearn.neural_network import MLPClassifier
 
 class EmbedderClassifier(object):
-    def __init__(self):
-        self._embedder_model = AnnotationEmbedder()
-        # self._classification_head = LogisticRegression(max_iter=1000)
-        self._classification_head =  NeuralNetClassifier()
+    def __init__(self, embedder, classifider):
+        self._embedder_model = embedder
+        self._classification_head =  classifider
 
         
     def _embed(self, sentences):

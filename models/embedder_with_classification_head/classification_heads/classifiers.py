@@ -3,17 +3,14 @@ from sklearn.neural_network import MLPClassifier
 from sklearn.utils import compute_sample_weight
 from ...config import AnnotationLabels
 
+
 class NeuralNetClassifier():
-    def __init__(self, activation='relu'):
-        self.model = MLPClassifier(hidden_layer_sizes=(64, 32),
-                    activation='relu',
-                    solver='adam',        # use Adam optimizer
-                    learning_rate_init=0.001,
-                    max_iter=500,
-                    random_state=42)
+    def __init__(self, train_with_sample_weights=False, **model_kwargs):
+        self._train_with_sample_weights = train_with_sample_weights
+        self.model = MLPClassifier(**model_kwargs)
         
-    def train(self, train_x, train_y, class_weights=True):
-        if class_weights:
+    def train(self, train_x, train_y):
+        if self._train_with_sample_weights:
             classes = np.unique(AnnotationLabels.id2label.keys())
             
             sample_weights = compute_sample_weight(
@@ -21,10 +18,10 @@ class NeuralNetClassifier():
                 y=train_y
                 )
 
-            import pdb; pdb.set_trace()
-            self.model.fit(train_x, train_y, sample_weights=sample_weights)
+            self.model.fit(train_x, train_y, sample_weight=sample_weights)
         else:
             self.model.fit(train_x, train_y)
 
     def predict(self, X):
         return self.model.predict(X) 
+    

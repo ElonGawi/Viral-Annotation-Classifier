@@ -1,8 +1,10 @@
 from sentence_transformers import SentenceTransformer
 
+
+
 class AnnotationEmbedder():
-    def __init__(self):
-        self.model = SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')
+    def __init__(self, model_name):
+        self.model = SentenceTransformer(model_name)
     
     def train(self, train_x, train_y):
         pass

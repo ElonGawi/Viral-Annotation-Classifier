@@ -10,7 +10,7 @@ from sklearn.naive_bayes import MultinomialNB, ComplementNB
 class TFIDFClassifier:
     def __init__(self):
         self._lemmatizer = spacy.load("en_core_web_sm", disable=["parser", "ner", "textcat"])
-        self._clf =  RandomForestClassifier(bootstrap=True, class_weight='balanced', max_depth=10, max_features='sqrt', min_samples_leaf=2, min_samples_split=11, n_estimators=910, random_state=42, n_jobs=-1)
+        self._clf = LogisticRegression(solver="saga", max_iter=1000, penalty='l2', C=17.0798, class_weight=None)
         self._vectorizer = TfidfVectorizer(lowercase=False, stop_words=list(ENGLISH_STOP_WORDS), ngram_range=(1,2), max_df=0.9)
 
 

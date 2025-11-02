@@ -1,4 +1,5 @@
 *.pyc
+reports
 llm_clean.ipynb
 llm_test.ipynb
 test_model_perf.ipynb

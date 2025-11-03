@@ -1,7 +1,5 @@
-import numpy as np
 from sklearn.neural_network import MLPClassifier
 from sklearn.utils import compute_sample_weight
-from ...config import AnnotationLabels
 
 
 class NeuralNetClassifier():
@@ -11,7 +9,6 @@ class NeuralNetClassifier():
         
     def train(self, train_x, train_y):
         if self._train_with_sample_weights:
-            classes = np.unique(AnnotationLabels.id2label.keys())
             
             sample_weights = compute_sample_weight(
                 class_weight='balanced',

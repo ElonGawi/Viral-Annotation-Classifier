@@ -1,11 +1,3 @@
-from sklearn.model_selection import train_test_split
-from sentence_transformers import SentenceTransformer
-from sklearn.linear_model import LogisticRegression
-from .classification_heads.classifiers import NeuralNetClassifier
-from .embedders.embedders import AnnotationEmbedder
-
-from sklearn.neural_network import MLPClassifier
-
 class EmbedderClassifier(object):
     def __init__(self, embedder, classifider):
         self._embedder_model = embedder

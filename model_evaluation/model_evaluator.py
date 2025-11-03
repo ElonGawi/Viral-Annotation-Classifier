@@ -1,9 +1,7 @@
 import pandas as pd
 import time
 import psutil
-import os
-import tracemalloc, time
-from sklearn.metrics import classification_report, confusion_matrix, balanced_accuracy_score
+from sklearn.metrics import classification_report, confusion_matrix
 from sklearn.metrics import ConfusionMatrixDisplay
 from sklearn.utils.multiclass import unique_labels
 from typing import Protocol, runtime_checkable
@@ -11,44 +9,14 @@ from models.config import AnnotationLabels
 import threading
 import matplotlib.pyplot as plt
 from IPython.display import display, HTML
-import pandas as pd
-import time
-import psutil
-import os
-import tracemalloc, time
-from sklearn.metrics import classification_report, confusion_matrix, balanced_accuracy_score
-from sklearn.metrics import ConfusionMatrixDisplay
-from sklearn.utils.multiclass import unique_labels
-from typing import Protocol, runtime_checkable
-from models.config import AnnotationLabels
-import threading
 import plotly.graph_objects as go
-import matplotlib.pyplot as plt
-import matplotlib.pyplot as plt
-import plotly.graph_objects as go
-from IPython.display import display, HTML
 import numpy as np
-import io, base64
-from matplotlib.gridspec import GridSpec
-import matplotlib.pyplot as plt
-import plotly.graph_objects as go
-from IPython.display import display, HTML
-import numpy as np
-import io, base64
-import json
+import io
+import base64
 import pickle
 from dash import Dash, dash_table, Input, Output, dcc, html
-import pandas as pd
-import numpy as np
-from dash import Dash, dcc, html, Input, Output
-import pandas as pd
-import numpy as np
 import plotly.express as px
-import dash
-from dash import dcc, html, Input, Output, Dash, ctx # 'ctx' is needed again
-import plotly.express as px
-import pandas as pd
-import numpy as np
+from dash import ctx # 'ctx' is needed again
 
 
 class ModelReport(object):

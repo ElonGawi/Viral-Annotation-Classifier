@@ -1,1 +1,1 @@
-from .classifiers import NeuralNetClassifier
+from .classifiers import NeuralNetClassifier, GenericSklearnCalssifier

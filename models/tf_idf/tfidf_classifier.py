@@ -35,7 +35,8 @@ class TFIDFClassifier:
             self,
             spacy_model: str = "en_core_web_sm",
             classifier: Optional[BaseEstimator] = None,
-            vectorizer: Optional[TfidfVectorizer] = None
+            vectorizer: Optional[TfidfVectorizer] = None,
+            is_fitted: bool = False
         ) -> None:
 
         """
@@ -58,16 +59,15 @@ class TFIDFClassifier:
                                             stop_words=list(ENGLISH_STOP_WORDS), 
                                             ngram_range=(1,2), 
                                             max_df=0.9)`.
+            is_fitted (bool):
+                Defines if the passed vectorizer and classifier are pre-fit. 
+                Defaults to False. 
 
         Raises:
             OSError: 
                 If the passed spaCy language model `spacy_model` cannot be loaded
             TypeError: 
-                If the passed classifier `classifier` is not a scikit-learn classifier
-            TypeError: 
                 If the passed classifier `classifier` does not have the method `fit` nor `predict`
-            TypeError: 
-                If the passed TF-IDF vectorizer `vectorizer` is not an instance of `TfidfVectorizer`
             TypeError: 
                 If the passed TF-IDF vectorizer `vectorizer` does not have the method
                 `fit_transform` nor `transform`
@@ -84,20 +84,13 @@ class TFIDFClassifier:
 
         # Validate classifier
         if classifier is None:
-            classifier = LogisticRegression(
-                solver="saga",
-                max_iter=1000,
-                penalty='l2',
-                C=17.0798,
-                class_weight=None
+            classifier =  LogisticRegression(
+                    solver="saga", 
+                    max_iter=1000, 
+                    penalty='l2', 
+                    C=17.0798, 
+                    class_weight=None
                 )
-
-        # Checking the classifier is a scikit-learn estimator
-        elif not isinstance(classifier, BaseEstimator):
-            raise TypeError(
-                f"`classifier` must be a scikit-learn estimator (BaseEstimator). got {type(classifier)}"
-            )
-        # Enforcing that the classifier has required methods
         else:
             for required_method in ("fit", "predict"):
                 if not hasattr(classifier, required_method):
@@ -116,13 +109,6 @@ class TFIDFClassifier:
                 ngram_range=(1,2),
                 max_df=0.9
                 )
-        # Checking the vectorizer is a TfidfVectorizer
-        elif not isinstance(vectorizer, TfidfVectorizer):
-            raise TypeError(
-                f"`vectorizer`must be an instance of sklearn.feature_extraction.text.TfidfVectorizer, "
-                f"got {type(vectorizer)}."
-            )
-        # Enforcing that the vectorizer has the required methods
         else:
             for required_method in ("fit_transform", "transform"):
                 if not hasattr(vectorizer, required_method):
@@ -133,7 +119,7 @@ class TFIDFClassifier:
 
         self._vectorizer = vectorizer
 
-        self._is_fitted: bool = False
+        self._is_fitted = is_fitted
 
     def fit(self, train_df: pd.DataFrame) -> None:
 
@@ -205,14 +191,17 @@ class TFIDFClassifier:
 
         self._is_fitted = True
 
-    def predict(self, annotations: Union[Sequence[str], pd.Series]) -> np.ndarray:
+    def predict(self, annotations: Union[Sequence[str], pd.Series], probabilities: bool=False) -> np.ndarray:
 
         """
         Predicts labels for a sequence of input texts.
 
         Args:
-            X (Union[Sequence[str], pd.Series]): 
+            annotations (Union[Sequence[str], pd.Series]): 
                 A sequence (list, tuple, or pandas Series) of text strings to classify.
+            probabilities (bool):
+                Flag insicating if the method passes predicted labels or predicted 
+                probabilities. Defaults to False. 
 
         Raises:
             NotFittedError: 
@@ -223,11 +212,12 @@ class TFIDFClassifier:
                 If the passed sequence contains entries that are not valid annotations
             ValueError: 
                 If the number of predictors generated are not equal to the number
-                of annotations passed
+                of annotations passed, or the predicted probabilities do not have
+                three columns and the same length as number of annotations passed
 
         Returns:
             np.ndarray: 
-                Numpy ndarray of predicted labels
+                Numpy ndarray of predicted labels or of predicted probabilities
         """
 
         if not self._is_fitted:
@@ -252,18 +242,33 @@ class TFIDFClassifier:
         vectors = self._vectorizer.transform(cleaned)
 
         # Predict the outcome using a classifier
-        preds = self._clf.predict(vectors)
+        if probabilities:
+            if not hasattr(self._clf, "predict_proba"):
+                raise TypeError(
+                    "Probabilities can only be predicted if the classifier implements the "
+                    f"`predict_proba` method, {self._clf.__class__.__name__} does not."
+                )
+            preds = self._clf.predict_proba(vectors)
+        else:
+            preds = self._clf.predict(vectors)
 
         # Ensure output is a Numpy ndarray
         if not isinstance(preds, np.ndarray):
             preds = np.asarray(preds)
 
         # Check there are as many predictions as input annotations
-        if preds.ndim != 1 or preds.shape[0] != len(annotations):
-            raise ValueError(
-                f"Classifier returned predictions with unexpected shape {preds.shape}, "
-                f"expected ({len(annotations)},)."
-            )
+        if probabilities:
+            if preds.ndim != 2 or preds.shape[0] != len(annotations) or preds.shape[1] != 3:
+                raise ValueError(
+                    f"Classifier returned predictions with unexpected shape {preds.shape}, "
+                    f"expected ({len(annotations)}, 3)."
+                )
+        else:
+            if preds.ndim != 1 or preds.shape[0] != len(annotations):
+                raise ValueError(
+                    f"Classifier returned predictions with unexpected shape {preds.shape}, "
+                    f"expected ({len(annotations)},)."
+                )
 
         return preds
 
@@ -356,7 +361,7 @@ class TFIDFClassifier:
         return self._is_fitted
 
     @property
-    def classifier(self) -> dict:
+    def classifier_parameters(self) -> dict:
 
         """
         Returns the parameters of the underlying classifier.
@@ -369,7 +374,7 @@ class TFIDFClassifier:
         return self._clf.get_params()
 
     @property
-    def vectorizer(self) -> dict:
+    def vectorizer_parameters(self) -> dict:
 
         """
         Returns the parameters of the undeying TF-IDF vectorizer

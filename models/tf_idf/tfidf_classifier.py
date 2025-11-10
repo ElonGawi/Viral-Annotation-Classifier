@@ -10,7 +10,7 @@ from sklearn.base import BaseEstimator
 from sklearn.exceptions import NotFittedError
 from sklearn.feature_extraction.text import TfidfVectorizer, ENGLISH_STOP_WORDS
 from sklearn.linear_model import LogisticRegression
-from sklearn.svm import LinearSVC
+from sklearn.svm import SVC
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.naive_bayes import MultinomialNB, ComplementNB
 
@@ -84,13 +84,11 @@ class TFIDFClassifier:
 
         # Validate classifier
         if classifier is None:
-            classifier =  LogisticRegression(
-                    solver="saga", 
-                    max_iter=1000, 
-                    penalty='l2', 
-                    C=17.0798, 
-                    class_weight=None
-                )
+            classifier =  LogisticRegression(solver="saga",
+                                             max_iter=1000,
+                                             penalty='l2',
+                                             C=17.0798,
+                                             class_weight=None)
         else:
             for required_method in ("fit", "predict"):
                 if not hasattr(classifier, required_method):

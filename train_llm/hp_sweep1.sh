@@ -1,20 +1,23 @@
 #!/usr/bin/env bash
-# run_pmb_sweep.sh
-# Small hyperparameter sweep for PubMedBERT on annotation classification
 
-set -e  # stop on first error
-set -u  # treat unset vars as errors
+set -e
+set -u
 
-MODEL="pmb"
-PROJECT_ROOT="$(dirname "$0")"
+MODEL="pmb" # PubMedBert
 
-# You can tweak these grids if desired
+# Directory of the script
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+
+# Project root (parent directory of script directory
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+cd "$PROJECT_ROOT"
+
+# Hyperparameter grids
 LEARNING_RATES=(1e-5 2e-5 3e-5)
 EPOCHS=(3 5)
 
-echo "Starting PubMedBERT hyperparameter sweep..."
+echo "Starting hyperparameter sweep..."
 echo "Model: $MODEL"
-echo "Project root: $PROJECT_ROOT"
 echo
 
 for LR in "${LEARNING_RATES[@]}"; do
@@ -32,9 +35,9 @@ for LR in "${LEARNING_RATES[@]}"; do
       --epochs "$EP"
 
     echo
-    echo "Finished $RUN"
+    echo "Finished run: $RUN"
     echo
   done
 done
 
-echo "Sweep complete!"
+echo "Sweep complete"

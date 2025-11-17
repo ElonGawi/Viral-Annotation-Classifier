@@ -1,19 +1,16 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-cd "$(dirname "$0")"
-echo "Running deep PubMedBERT sweep from: $(pwd)"
-echo
-
-# You must have your virtual environment already activated!
-echo "Python version: $(python --version)"
-echo "Using Python from: $(which python)"
-echo
-
-######################
-# Sweep configuration
-######################
 MODEL="pmb"  # PubMedBERT
+
+# Script directory
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+
+# Project root is the parent directory of train_llm/
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+cd "$PROJECT_ROOT"
+
+### Hyperparameters
 
 # Finer learning rates around 2e-5
 LRS=("1.5e-5" "2e-5" "2.5e-5")
@@ -30,7 +27,7 @@ WEIGHT_DECAY="0.01"
 TRAIN_BS=16
 EVAL_BS=32
 
-# Where models are saved (matches your Python config)
+# Where models are saved (relative to project root)
 MODELS_DIR="models/fine_tuned_BERT_models"
 
 ######################
@@ -75,4 +72,4 @@ for LR in "${LRS[@]}"; do
   done
 done
 
-echo "All sweep runs completed"
+echo "Sweep complete"

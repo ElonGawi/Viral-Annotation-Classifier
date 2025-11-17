@@ -1,10 +1,10 @@
-from enum import Enum
+from pathlib import Path
 
-# # possible labels 
-# class AnnotationLabel(Enum):
-#         Uninformative = 0
-#         Low = 1
-#         Proper = 2 
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+MODELS_DIR = PROJECT_ROOT / "models" / "fine_tuned_BERT_models"
+
+PMB_DIR = MODELS_DIR / "PMB_model"
+BERT_DIR = MODELS_DIR / "BERT_model"
 
 class AnnotationLabels(object):
         label_names = ["Uninformative", "Low", "Proper"]  # Expected label names

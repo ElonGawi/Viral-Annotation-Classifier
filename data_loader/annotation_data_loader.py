@@ -10,6 +10,31 @@ class AnnotationDataLoader(object):
     def __init__(self, config=DataLoaderConfig):
         self._config = config
 
+    def _resample(self, df, class_ratio=None):
+        from imblearn.over_sampling import RandomOverSampler
+        from collections import Counter
+        if class_ratio:
+            classes_ref = [k for k, v in class_ratio.items() if v ==1] 
+
+            if len(classes_ref) != 1:
+                raise Exception("ERROR classes ratio must have at ONE class with the value 1 so the rest are relatiev to it")
+                
+            classes_ref = classes_ref[0]
+            len_of_ref = (df["label"] == classes_ref).sum()
+
+            target_counts = {}
+            for k, v in class_ratio.items():
+                target_counts[k] = int(len_of_ref * v)
+        
+            ros = RandomOverSampler(sampling_strategy = target_counts)
+        else:
+            ros = RandomOverSampler()
+
+        X_train_resampled, y_train_resampled = ros.fit_resample(np.array(df["protein_annotation"]).reshape(-1, 1), df["label"])
+        df = pd.DataFrame({"protein_annotation" :   X_train_resampled.flatten(), "label": y_train_resampled})
+        print(f"Original Training Class Distribution: {Counter(y_train_resampled)}")
+
+
     def get_train(self, resample=False, class_ratio=None):
         """
         Rerturn the post-splited training data
@@ -21,34 +46,13 @@ class AnnotationDataLoader(object):
         train_df =  pd.read_csv(train_path, sep="\t")
         
         if resample:            
-            from imblearn.over_sampling import RandomOverSampler
-            from collections import Counter
-            if class_ratio:
-                classes_ref = [k for k, v in class_ratio.items() if v ==1] 
-
-                if len(classes_ref) != 1:
-                    raise Exception("ERROR classes ratio must have at ONE class with the value 1 so the rest are relatiev to it")
-                    
-                classes_ref = classes_ref[0]
-                len_of_ref = (train_df["label"] == classes_ref).sum()
-
-                target_counts = {}
-                for k, v in class_ratio.items():
-                    target_counts[k] = int(len_of_ref * v)
-            
-                ros = RandomOverSampler(sampling_strategy = target_counts)
-            else:
-                ros = RandomOverSampler()
-
-            X_train_resampled, y_train_resampled = ros.fit_resample(np.array(train_df["protein_annotation"]).reshape(-1, 1), train_df["label"])
-            train_df = pd.DataFrame({"protein_annotation" :   X_train_resampled.flatten(), "label": y_train_resampled})
-            print(f"Original Training Class Distribution: {Counter(y_train_resampled)}")
+            train_df = self._resample(train_df, class_ratio)
 
         return train_df
     
 
     
-    def get_train_all(self):
+    def get_train_all(self, resample=False, class_ratio=None):
         """
         Return the entire 5k data set
         class ratio: e.g. {0: 0.3, 
@@ -60,28 +64,7 @@ class AnnotationDataLoader(object):
         train_df =  pd.read_csv(train_path, sep="\t")
         
         if resample:            
-            from imblearn.over_sampling import RandomOverSampler
-            from collections import Counter
-            if class_ratio:
-                classes_ref = [k for k, v in class_ratio.items() if v ==1] 
-
-                if len(classes_ref) != 1:
-                    raise Exception("ERROR classes ratio must have at ONE class with the value 1 so the rest are relatiev to it")
-                    
-                classes_ref = classes_ref[0]
-                len_of_ref = (train_df["label"] == classes_ref).sum()
-
-                target_counts = {}
-                for k, v in class_ratio.items():
-                    target_counts[k] = int(len_of_ref * v)
-            
-                ros = RandomOverSampler(sampling_strategy = target_counts)
-            else:
-                ros = RandomOverSampler()
-
-            X_train_resampled, y_train_resampled = ros.fit_resample(np.array(train_df["protein_annotation"]).reshape(-1, 1), train_df["label"])
-            train_df = pd.DataFrame({"protein_annotation" :   X_train_resampled.flatten(), "label": y_train_resampled})
-            print(f"Original Training Class Distribution: {Counter(y_train_resampled)}")
+            train_df = self._resample(train_df, class_ratio)
 
         return train_df
     

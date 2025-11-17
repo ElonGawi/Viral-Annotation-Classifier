@@ -1,21 +1,22 @@
-import numpy as np
 import pandas as pd
 import time
 import psutil
-import matplotlib.pyplot as plt
 from sklearn.metrics import classification_report, confusion_matrix
 from sklearn.metrics import ConfusionMatrixDisplay
 from sklearn.utils.multiclass import unique_labels
 from typing import Protocol, runtime_checkable
 from models.config import AnnotationLabels
 import threading
+import matplotlib.pyplot as plt
 from IPython.display import display, HTML
-import io, base64
-from matplotlib.gridspec import GridSpec
 import plotly.graph_objects as go
+import numpy as np
+import io
+import base64
 import pickle
-from dash import Dash, dash_table, Input, Output, dcc, html, ctx
+from dash import Dash, dash_table, Input, Output, dcc, html
 import plotly.express as px
+from dash import ctx # 'ctx' is needed again
 
 
 class ModelReport(object):
@@ -23,7 +24,7 @@ class ModelReport(object):
 
         self.eval_df = None
         self.y_preds = None
-
+        self.y_preds_probs = None
         self.model_title = None
         self.model_info = None
         # self.metrics = None
@@ -518,6 +519,24 @@ class ModelReport(object):
         with open(path, "rb") as f:
             return pickle.load(f)
 
+    def prediction_df(self):
+        if self.y_preds_probs is not None:
+            return pd.DataFrame({
+            "protein_annotation": self.eval_df["protein_annotation"],
+            "true_label": self.eval_df["label"],
+            "predicted_label": self.y_preds,
+            "predicted_proba_0": self.y_preds_probs[:,0],
+            "predicted_proba_1": self.y_preds_probs[:,1],
+            "predicted_proba_2": self.y_preds_probs[:,2],
+            })
+        else:
+            return pd.DataFrame({
+                "protein_annotation": self.eval_df["protein_annotation"],
+                "true_label": self.eval_df["label"],
+                "predicted_label": self.y_preds
+                })
+
+            
     def show_misclassified_samples(self, true_label_to_filter=None):
 
         merged_df = pd.DataFrame({
@@ -535,7 +554,6 @@ class ModelReport(object):
             return miscalssified_df
         
 
-
 class ReportsComparison(object):
     def __init__(self, reports):
         self._reports = reports
@@ -552,6 +570,11 @@ class ReportsComparison(object):
 
         for weighted_avg_item in report.weighted_avg.keys():
             report_dict[f"Weighted Average ({weighted_avg_item})"] =  report.weighted_avg[weighted_avg_item]
+
+        for label, label_metrics in report.metric_per_label.items():
+            for metric, metric_val in label_metrics.items():
+                report_dict[f"{metric} - {label}"] = metric_val 
+
 
         return report_dict
 
@@ -901,8 +924,6 @@ class ReportsComparison(object):
         frame_height = 200 + (50 * len(df)) if (200 + (50 * len(df))) < 1000 else 1000
         app.run(mode='inline', jupyter_height= frame_height)
 
-    
-
 
 class ModelEvaluator(object):
     def __init__(self, model, eval_dataset):
@@ -919,7 +940,9 @@ class ModelEvaluator(object):
         self.eval_dataset = eval_dataset
 
 
-    def _predict(self): 
+    def _predict(self, probablities=False): 
+        if probablities:
+            return self.model.predict(self.eval_dataset["protein_annotation"], probablities=probablities)
         return self.model.predict(self.eval_dataset["protein_annotation"])
     
 
@@ -958,7 +981,7 @@ class ModelEvaluator(object):
         return stop_event, memory_records, cpu_usage_records
 
 
-    def _predict_and_profile(self, report, profile=True, monitor_interval=0.01):
+    def _predict_and_profile(self, report, profile=True, monitor_interval=0.01, include_probablities=False):
         """run preidtc and track performence such as time, mem usage
 
         Args:
@@ -971,7 +994,7 @@ class ModelEvaluator(object):
         
         start_time = time.perf_counter()
 
-        preds = self._predict()
+        preds = self._predict(probablities=include_probablities)
 
         end_time = time.perf_counter()
 
@@ -985,7 +1008,7 @@ class ModelEvaluator(object):
 
         return preds, report
 
-    def generate_report(self):
+    def generate_report(self, include_probablities=False):
         report = ModelReport()     
         report.model_title = self.model.model_title
         report.model_info = self.model.model_info
@@ -994,9 +1017,14 @@ class ModelEvaluator(object):
 
         y_true = self.eval_dataset["label"]
 
-        y_pred, report = self._predict_and_profile(report=report)
+        y_pred, report = self._predict_and_profile(report=report, include_probablities=include_probablities)
 
-        report.y_preds = y_pred 
+        if include_probablities:
+            report.y_preds_probs = y_pred
+            y_pred =  np.argmax(y_pred, axis=1)
+                    
+        report.y_preds = y_pred
+
         metrics_dict = classification_report(y_true=y_true, y_pred=y_pred, output_dict=True)
 
         report.add_classfication_report_dict(metrics_dict)
@@ -1006,8 +1034,6 @@ class ModelEvaluator(object):
         report.cm = confusion_matrix(y_true,y_pred)
         return report
     
-
-
 @runtime_checkable
 class ModelEvalInfoInterface(Protocol):
     """
@@ -1016,6 +1042,7 @@ class ModelEvalInfoInterface(Protocol):
     """
     model_title: str
     model_info: str
+
 
 @runtime_checkable
 class ModelEvalPredictInterface(Protocol):

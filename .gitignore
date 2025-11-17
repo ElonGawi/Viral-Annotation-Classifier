@@ -6,3 +6,5 @@ test_model_perf.ipynb
 tmp_trainer/
 models/fine_tuned_BERT_models/BERT_model/
 models/fine_tuned_BERT_models/PMB_model/
+models/fine_tuned_BERT_models/PMB_lr2.5e-5_ep5_ls0.1/
+models/fine_tuned_BERT_models/PMB_lr2e-5_ep5/

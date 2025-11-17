@@ -2,8 +2,6 @@ import os
 from pathlib import Path
 
 module_dir = Path(__file__).parent
-
-
 class DataLoaderConfig(object):
     output_dir_relative = r"data"
     # make path absolute
@@ -13,6 +11,3 @@ class DataLoaderConfig(object):
     val_filename = r"val_split.tsv"
     test_filename = r"test_split.tsv"
 
-
-# y= "label"
-# x = "protein_annotation"

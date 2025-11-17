@@ -12,7 +12,7 @@ class AnnotationDataLoader(object):
 
     def get_train(self, resample=False, class_ratio=None):
         """
-        Rerturn the pre-splited training data
+        Rerturn the post-splited training data
         class ratio: e.g. {0: 0.3, 
                             1: 0.3, 
                             2: 1}
@@ -48,14 +48,15 @@ class AnnotationDataLoader(object):
     
 
     
-    def get_all_train(self, resample=False, class_ratio=None):
+    def get_train_all(self):
         """
-        Rerturn the pre-splited training data
+        Return the entire 5k data set
         class ratio: e.g. {0: 0.3, 
                             1: 0.3, 
                             2: 1}
         """
-        train_path = os.path.join(self._config.output_dir, self._config.alltrain_filename)
+        all_path = os.path.join(self._config.output_dir, self._config.train_all_filename)
+        train_path = os.path.join(self._config.output_dir, self._config.train_all_filename)
         train_df =  pd.read_csv(train_path, sep="\t")
         
         if resample:            
@@ -87,15 +88,17 @@ class AnnotationDataLoader(object):
 
     def get_validation(self):
         """
-        Rerturn the pre-splited val data
+        Return the post-splited val data
         """
         val_path = os.path.join(self._config.output_dir, self._config.val_filename)
         return pd.read_csv(val_path, sep="\t")
 
     def get_test(self):
         """
-        Rerturn the pre-splited test data
+        Return the post-splited test data
         """
 
         test_path = os.path.join(self._config.output_dir, self._config.test_filename)
         return pd.read_csv(test_path, sep="\t")
+    
+  

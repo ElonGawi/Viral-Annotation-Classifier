@@ -17,6 +17,17 @@ class EmbedderClassifier(object):
         embeddings = self._embed(train_x)
         self._classification_head.train(embeddings, train_y)
 
-    def predict(self, X):
+    def predict(self, X, probablities=False):
         embeddings = self._embed(X)
-        return self._classification_head.predict(embeddings)
+        return self._classification_head.predict(embeddings, probablities=probablities)
+    
+
+
+
+
+
+
+
+
+
+

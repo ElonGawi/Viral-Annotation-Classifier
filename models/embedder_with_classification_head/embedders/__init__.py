@@ -1,1 +1,1 @@
-from .embedders import AnnotationEmbedder
+from .embedders import SentenceTransformerEmbedder

@@ -1,11 +1,3 @@
-from sklearn.model_selection import train_test_split
-from sentence_transformers import SentenceTransformer
-from sklearn.linear_model import LogisticRegression
-from .classification_heads.classifiers import NeuralNetClassifier
-from .embedders.embedders import AnnotationEmbedder
-
-from sklearn.neural_network import MLPClassifier
-
 class EmbedderClassifier(object):
     def __init__(self, embedder, classifider):
         self._embedder_model = embedder
@@ -25,6 +17,17 @@ class EmbedderClassifier(object):
         embeddings = self._embed(train_x)
         self._classification_head.train(embeddings, train_y)
 
-    def predict(self, X):
+    def predict(self, X, probablities=False):
         embeddings = self._embed(X)
-        return self._classification_head.predict(embeddings)
+        return self._classification_head.predict(embeddings, probablities=probablities)
+    
+
+
+
+
+
+
+
+
+
+

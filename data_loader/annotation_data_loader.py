@@ -84,4 +84,20 @@ class AnnotationDataLoader(object):
         test_path = os.path.join(self._config.output_dir, self._config.test_filename)
         return pd.read_csv(test_path, sep="\t")
     
-  
+
+    def get_test(self):
+        """
+        Return the post-splited test data
+        """
+
+        test_path = os.path.join(self._config.output_dir, self._config.test_filename)
+        return pd.read_csv(test_path, sep="\t")
+    
+
+    def get_last_test_set_no_overlap(self):
+        """
+        returns the last test set, without the overlap it had with the original training 
+        """
+        test_path = os.path.join(self._config.output_dir, self._config.last_test_set_no_overlap_filename)
+        return pd.read_csv(test_path, sep="\t")
+

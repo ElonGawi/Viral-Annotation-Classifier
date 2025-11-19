@@ -10,3 +10,4 @@ class DataLoaderConfig(object):
     val_filename = r"val_split.tsv"
     test_filename = r"test_split.tsv"
     train_all_filename = r"train_all.tsv"
+    last_test_set_no_overlap_filename = r"all_test_nooverlap.tsv"

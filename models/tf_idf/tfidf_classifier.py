@@ -335,14 +335,6 @@ class TFIDFClassifier:
                 obj = pickle.load(f)
         except (OSError, pickle.UnpicklingError) as e:
             raise IOError(f"Error loading classifier from '{path}': {e}") from e
-
-        # Checking that the object is a TFIDFC
-        if not isinstance(obj, cls):
-            raise TypeError(
-                f"Object loaded from '{path}' is not a {cls.__name__} instance "
-                f"(got {type(obj)} instead)."
-            )
-
         return obj
 
     @property

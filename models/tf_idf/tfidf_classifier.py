@@ -13,7 +13,7 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.svm import SVC
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.naive_bayes import MultinomialNB, ComplementNB
-
+from importlib.resources import files
 
 class TFIDFClassifier:
 
@@ -33,7 +33,6 @@ class TFIDFClassifier:
 
     def __init__(
             self,
-            spacy_model: str = "en_core_web_sm",
             classifier: Optional[BaseEstimator] = None,
             vectorizer: Optional[TfidfVectorizer] = None,
             is_fitted: bool = False
@@ -43,16 +42,9 @@ class TFIDFClassifier:
         Initializes a TFIDFClassifier instance. 
 
         Args:
-            spacy_model (str, optional): 
-                The name of the spaCy language model to load for lemmatization.
-                Defaults to "en_core_web_sm".
             classifier (Optional[BaseEstimator], optional): 
                 A scikit-learn classifier implementing `fit` and `predict`. 
-                Defaults to `LogisticRegression(solver="saga", 
-                                                max_iter=1000,
-                                                penalty='l2', 
-                                                C=17.0798, 
-                                                class_weight=None)`. 
+                Defaults to `ComplementNB(alpha=0.002783)`. 
             vectorizer (Optional[TfidfVectorizer], optional):
                 A TF-IDF vectorizer.
                 Defaults to `TfidfVectorizer(lowercase=False,
@@ -64,31 +56,15 @@ class TFIDFClassifier:
                 Defaults to False. 
 
         Raises:
-            OSError: 
-                If the passed spaCy language model `spacy_model` cannot be loaded
             TypeError: 
                 If the passed classifier `classifier` does not have the method `fit` nor `predict`
             TypeError: 
                 If the passed TF-IDF vectorizer `vectorizer` does not have the method
                 `fit_transform` nor `transform`
         """
-
-        # Loading spaCy model
-        try:
-            self._lemmatizer = spacy.load(spacy_model, disable=["parser", "ner", "textcat"])
-        except OSError as e:
-            raise OSError(
-                f"Could not load spaCy model '{spacy_model}'."
-                "Make sure it is installed (e.g. `python -m spacy download en_core_web_sm`)."
-            ) from e
-
         # Validate classifier
         if classifier is None:
-            classifier =  LogisticRegression(solver="saga",
-                                             max_iter=1000,
-                                             penalty='l2',
-                                             C=17.0798,
-                                             class_weight=None)
+            classifier = ComplementNB(alpha=0.002783)
         else:
             for required_method in ("fit", "predict"):
                 if not hasattr(classifier, required_method):
@@ -172,12 +148,12 @@ class TFIDFClassifier:
             raise ValueError("`label` column contains missing values.")
 
         texts = train_df["protein_annotation"]
-
+        lm = spacy.load("en_core_web_sm", disable=["parser", "ner", "textcat"])
         # Applying cleaning and lemmatization function
         cleaned_texts: List[str] = []
         for i, t in texts.items():
             try:
-                cleaned_texts.append(self._clean_lemmatize(t))
+                cleaned_texts.append(self._clean_lemmatize(t, lm))
             except (TypeError, ValueError) as e:
                 raise type(e)(f"Invalid `protein_annotation` at index {i}: {e}") from e
 
@@ -227,12 +203,12 @@ class TFIDFClassifier:
 
         # Validate that X is a proper sequence
         raw_texts = self._validate_text_sequence(annotations)
-
+        lm = spacy.load("en_core_web_sm", disable=["parser", "ner", "textcat"])
         # Clean and lemmatize each entry, with index-aware error messages
         cleaned: List[str] = []
         for i, t in enumerate(raw_texts):
             try:
-                cleaned.append(self._clean_lemmatize(t))
+                cleaned.append(self._clean_lemmatize(t, lm))
             except (TypeError, ValueError) as e:
                 raise type(e)(f"Invalid text at index {i}: {e}") from e
 
@@ -302,28 +278,29 @@ class TFIDFClassifier:
             raise IOError(f"Error saving classifier to '{path}': {e}") from e
 
     @classmethod
-    def load_from_file(cls, path: Union[str, os.PathLike]) -> "TFIDFClassifier":
+    def load_from_file(cls, path: Union[str, os.PathLike] = None) -> "TFIDFClassifier":
 
         """
         Loads a TFIDFClassifier instance from a pickle file
 
         Args:
             path (Union[str, os.PathLike]): 
-                The path containing the pickle file
+                The path containing the pickle file. If None, loads deafualt pretrained model.
+                Defaults to None. 
 
         Raises:
             FileNotFoundError:
                 If the file does not exist in the given path
             IOError: 
                 If there is an error unpickling the file
-            TypeError: 
-                If the loaded object is not an instance of a TFIDFCLassifier
 
         Returns:
             TFIDFClassifier: 
                 An instance of a TFIDFClassifier
         """
-
+        
+        if path is None:
+            path = os.path.join(files("inphormer"), "models", "tf_idf", "ComplementNaiveBayes_TF-IDF.pkl")
         path = Path(path)
 
         # Checking that the file exists
@@ -395,7 +372,7 @@ class TFIDFClassifier:
             f"status={status})"
             )
 
-    def _clean_lemmatize(self, text: str) -> str:
+    def _clean_lemmatize(self, text: str, lemmatizer) -> str:
 
         """
         Cleans a text string and lemmatize using spaCy.
@@ -427,7 +404,7 @@ class TFIDFClassifier:
         text = re.sub(r"\s+", " ", text)  # Cleans up extra spaces again
 
         # Lemmatization
-        doc = self._lemmatizer(text)
+        doc = lemmatizer(text)
         lemmas: List[str] = []
 
         for tok in doc:

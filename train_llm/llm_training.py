@@ -30,9 +30,9 @@ def parse_args():
     parser.add_argument(
         "--model",
         type=str,
-        choices=["pmb", "bert", "biolb"],
+        choices=["pmb", "bert"],
         default="bert",
-        help="Which base model to use: 'pmb', 'bert', or 'biolb' (default: bert)",
+        help="Which base model to use: 'pmb', 'bert' (default: bert)",
     )
     parser.add_argument(
         "--run-name",
